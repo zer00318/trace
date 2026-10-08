@@ -125,3 +125,5 @@ ggml-*.bin
 *.sqlite3-shm
 evaluation/frame_gold/
 evaluation/ax_corpus/
+ops/certs/
+*.pem
