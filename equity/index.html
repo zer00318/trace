@@ -1,0 +1,1688 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>TRACE Equity Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700;800;900&display=swap">
+<style>
+/* Layout: a game board. Left: a sticky scoreboard (donut, people, clock, alerts) that never leaves view.
+   Right: three numbered moves — pick the team, split the company, pull the levers. Phones stack, with a
+   fixed mini scoreboard that slides in once the real one scrolls away. */
+:root {
+  --paper: #ECEFF4; --dotgrid: #D9DEE7; --surface: #FFFFFF; --sunk: #E6EAF0; --ink: #111827; --muted: #5A6475;
+  --line: #D6DCE5; --line-strong: #B3BDCB; --track: #DCE1E9;
+  --accent: #2F4AD0; --accent-ink: #FFFFFF; --accent-soft: #E1E7FC;
+  --ok: #17734A; --ok-soft: #DBF0E4; --warn: #8F5300; --warn-soft: #FAEBD2; --bad: #B42318; --bad-soft: #FBE1DE;
+  --c0: #2F4AD0; --c1: #C42F6B; --c2: #0C8377; --c3: #B06A00; --inv0: #3E4756;
+  --hatch-a: #C5CCD8; --hatch-b: #EDF0F5; --unv-a: #D7DCE5; --unv-b: #F6F7FA;
+  --on-c: #FFFFFF;
+  --f-ui: 'Schibsted Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 14px;
+  --shadow: 0 1px 2px rgba(17, 24, 39, .06), 0 8px 24px rgba(17, 24, 39, .06);
+  --lift: 0 2px 4px rgba(17, 24, 39, .08), 0 14px 32px rgba(17, 24, 39, .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0C1118; --dotgrid: #19212D; --surface: #141A24; --sunk: #1B2330; --ink: #E6EAF1; --muted: #97A1B3;
+    --line: #262F3D; --line-strong: #3A4556; --track: #2A3342;
+    --accent: #8C9DFF; --accent-ink: #0C1118; --accent-soft: #222B4A;
+    --ok: #5BC98F; --ok-soft: #142E1F; --warn: #EFB25A; --warn-soft: #362810; --bad: #FF8A7D; --bad-soft: #3B1A18;
+    --c0: #8194FF; --c1: #F06C9C; --c2: #37C3B1; --c3: #E8AE4F; --inv0: #A9B3C5;
+    --hatch-a: #3A4456; --hatch-b: #20283A; --unv-a: #2B3341; --unv-b: #171D27;
+    --on-c: #0C1118;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .3);
+    --lift: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 32px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0C1118; --dotgrid: #19212D; --surface: #141A24; --sunk: #1B2330; --ink: #E6EAF1; --muted: #97A1B3;
+  --line: #262F3D; --line-strong: #3A4556; --track: #2A3342;
+  --accent: #8C9DFF; --accent-ink: #0C1118; --accent-soft: #222B4A;
+  --ok: #5BC98F; --ok-soft: #142E1F; --warn: #EFB25A; --warn-soft: #362810; --bad: #FF8A7D; --bad-soft: #3B1A18;
+  --c0: #8194FF; --c1: #F06C9C; --c2: #37C3B1; --c3: #E8AE4F; --inv0: #A9B3C5;
+  --hatch-a: #3A4456; --hatch-b: #20283A; --unv-a: #2B3341; --unv-b: #171D27;
+  --on-c: #0C1118;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .3);
+  --lift: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 32px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background-color: var(--paper); background-image: radial-gradient(var(--dotgrid) 1px, transparent 1.2px); background-size: 22px 22px; color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1480px; margin: 0 auto; padding-inline: 20px; padding-block: 0 32px; }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; padding-block: 22px 18px; }
+.brand h1 { font-size: 1.7rem; font-weight: 900; letter-spacing: -.03em; margin: 0; line-height: 1.05; }
+.brand h1 span { color: var(--accent); }
+.brand p { margin: 6px 0 0; color: var(--muted); font-size: .92rem; max-width: 62ch; }
+.tb { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 10px; padding: 7px 12px; font-size: .86rem; font-weight: 650; line-height: 1.2; text-decoration: none; }
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 5px 9px; font-size: .8rem; border-radius: 8px; }
+.btn.danger { color: var(--bad); }
+.btn svg { width: 15px; height: 15px; }
+
+/* grid */
+.game { display: grid; grid-template-columns: minmax(330px, 420px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.board { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; scrollbar-width: thin; padding: 2px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.play { display: grid; gap: 34px; min-width: 0; }
+section { scroll-margin-top: 84px; }
+
+/* step headings */
+.step-h { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+.step-h .n { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-weight: 900; font-size: 1rem; flex: none; }
+.step-h h2 { margin: 0; font-size: 1.35rem; font-weight: 850; letter-spacing: -.02em; }
+.step-h p { margin: 0; color: var(--muted); font-size: .88rem; }
+
+/* scoreboard */
+.score { padding: 16px 16px 12px; }
+.donutwrap { position: relative; width: 100%; max-width: 270px; margin: 0 auto; aspect-ratio: 1; }
+.donutwrap svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.donutwrap path { transition: opacity .15s; }
+.donutwrap path.dim { opacity: .3; }
+.dcenter { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; padding: 0 28%; }
+.dcenter b { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; font-family: var(--f-num); }
+.dcenter span { font-size: .78rem; color: var(--muted); margin-top: 4px; line-height: 1.25; }
+.dcenter .nm { font-size: .92rem; font-weight: 750; color: var(--ink); margin: 0 0 4px; font-family: var(--f-ui); }
+.dleg { text-align: center; font-size: .74rem; color: var(--muted); margin: 6px 0 10px; }
+.rows { display: grid; gap: 2px; }
+.prow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 6px; border-radius: 10px; position: relative; }
+.prow:hover, .prow.hl { background: var(--sunk); }
+.prow .meta { min-width: 0; }
+.prow .nm { font-weight: 750; font-size: .95rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prow .rl { font-size: .74rem; color: var(--muted); font-weight: 500; }
+.prow .big { font-family: var(--f-num); font-weight: 600; font-size: 1.28rem; text-align: right; line-height: 1; white-space: nowrap; }
+.prow .sub { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: .76rem; color: var(--muted); }
+.prow .sub .v { font-family: var(--f-num); }
+.prow .sub .v.diff { color: var(--accent); font-weight: 600; }
+.xp { grid-column: 2 / -1; height: 6px; border-radius: 99px; background: repeating-linear-gradient(135deg, var(--unv-a) 0 4px, var(--unv-b) 4px 8px); overflow: hidden; }
+.xp i { display: block; height: 100%; border-radius: 99px; transition: width .35s; }
+.av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 850; font-size: .95rem; color: var(--on-c); flex: none; }
+.av.lg { width: 48px; height: 48px; font-size: 1.25rem; }
+.av.pool { background: repeating-linear-gradient(135deg, var(--hatch-a) 0 5px, var(--hatch-b) 5px 10px); color: var(--ink); border: 1px solid var(--line-strong); }
+.delta { font-family: var(--f-num); font-size: .74rem; font-weight: 700; padding: 1px 6px; border-radius: 99px; animation: pop .35s ease-out; }
+.delta.up { background: var(--ok-soft); color: var(--ok); }
+.delta.down { background: var(--bad-soft); color: var(--bad); }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.badge { font-size: .68rem; font-weight: 750; padding: 2px 7px; border-radius: 99px; white-space: nowrap; letter-spacing: .01em; }
+.badge.b-decides, .badge.b-articles { background: var(--accent-soft); color: var(--accent); }
+.badge.b-blocks, .badge.b-tie { background: var(--warn-soft); color: var(--warn); }
+.pay { font-family: var(--f-num); font-weight: 600; color: var(--ink); }
+.salebox { margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: .8rem; color: var(--muted); }
+.thr { margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--line); display: grid; gap: 2px; font-size: .74rem; color: var(--muted); }
+.thr b { color: var(--ink); }
+
+/* clock */
+.clock { display: grid; gap: 8px; }
+.clock-top { display: flex; align-items: center; gap: 12px; }
+.playbtn { width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; flex: none; }
+.playbtn svg { width: 18px; height: 18px; }
+.clock-lab { display: grid; line-height: 1.15; }
+.clock-lab b { font-size: 1.15rem; font-weight: 800; }
+.clock-lab span { font-size: .78rem; color: var(--muted); }
+.ticks { display: flex; justify-content: space-between; font-size: .68rem; color: var(--muted); font-family: var(--f-num); padding: 0 4px; margin-top: -4px; }
+
+/* alerts */
+.alerts { display: grid; gap: 6px; }
+.msg { display: flex; gap: 8px; align-items: flex-start; padding: 9px 11px; border-radius: 10px; font-size: .84rem; line-height: 1.35; border: 1px solid transparent; }
+.msg .ic { flex: none; font-weight: 900; width: 16px; text-align: center; }
+.msg.bad { background: var(--bad-soft); color: var(--bad); animation: pop .3s; }
+.msg.warn { background: var(--warn-soft); color: var(--warn); }
+.msg.ok { background: var(--ok-soft); color: var(--ok); }
+.msg.neutral { background: var(--surface); border-color: var(--line); color: var(--ink); }
+
+/* sliders */
+.ctl { display: grid; gap: 2px; min-width: 0; }
+.ctl-h { display: flex; align-items: baseline; gap: 6px; font-size: .8rem; font-weight: 650; color: var(--muted); }
+.ctl-h label { min-width: 0; }
+.ctl-h output { margin-left: auto; font-family: var(--f-num); font-weight: 600; font-size: .95rem; color: var(--ink); white-space: nowrap; }
+.tag { font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; padding: 0 5px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); line-height: 1.6; }
+.tag.fact { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.hint { font-size: .76rem; color: var(--muted); margin: 0; }
+input[type=range].sl { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; margin: 0; --c: var(--accent); cursor: pointer; }
+.sl::-webkit-slider-runnable-track { height: 10px; border-radius: 99px; background: linear-gradient(to right, var(--c) var(--fill, 0%), var(--track) var(--fill, 0%)); }
+.sl::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 4px solid var(--c); margin-top: -8px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); transition: transform .12s; }
+.sl:active::-webkit-slider-thumb { transform: scale(1.15); }
+.sl::-moz-range-track { height: 10px; border-radius: 99px; background: var(--track); }
+.sl::-moz-range-progress { height: 10px; border-radius: 99px; background: var(--c); }
+.sl::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 4px solid var(--c); box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }
+
+/* segmented + switch */
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--sunk); border-radius: 11px; padding: 3px; gap: 2px; max-width: 100%; }
+.seg button { border: 0; background: transparent; padding: 6px 11px; border-radius: 9px; font-weight: 650; font-size: .82rem; color: var(--muted); line-height: 1.2; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.seglab { font-size: .8rem; font-weight: 650; color: var(--muted); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
+.sw { width: 46px; height: 26px; border-radius: 999px; border: 0; background: var(--track); position: relative; flex: none; padding: 0; transition: background .2s; }
+.sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s; }
+.sw[aria-checked="true"] { background: var(--accent); }
+.sw[aria-checked="true"]::after { transform: translateX(20px); }
+
+/* team */
+.cast { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 2px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; align-content: start; transition: border-color .2s, box-shadow .2s, background .2s; min-width: 0; }
+.card.in { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 7%, var(--surface)); box-shadow: var(--lift); }
+.card-top { display: flex; gap: 12px; align-items: center; }
+.card-top h3 { margin: 0; font-size: 1.05rem; font-weight: 800; line-height: 1.15; }
+.card-top small { color: var(--muted); font-size: .76rem; display: block; }
+.blurb { font-size: .8rem; color: var(--muted); margin: 0; line-height: 1.35; }
+.joinbtn { border: 2px dashed var(--line-strong); background: transparent; border-radius: 11px; padding: 9px; font-weight: 750; font-size: .9rem; }
+.joinbtn:hover:not(:disabled) { border-color: var(--pc); color: var(--pc); }
+.card.in .joinbtn { border-style: solid; border-color: var(--pc); background: var(--pc); color: var(--on-c); }
+.card.fixed .joinbtn { cursor: default; }
+.card .seg { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+.card .seg button { padding: 7px 6px; }
+.imp { font-size: .76rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 3px 8px; align-items: center; min-height: 1.2em; }
+.imp .d { font-family: var(--f-num); font-weight: 600; white-space: nowrap; color: var(--ink); }
+.imp .d.up { color: var(--ok); }
+.imp .d.down { color: var(--bad); }
+
+/* split */
+.splitbox { display: grid; gap: 10px; }
+.srow { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 8px; box-shadow: var(--shadow); }
+.srow-main { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+.lockbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; color: var(--muted); }
+.lockbtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lockbtn svg { width: 16px; height: 16px; }
+.owns { text-align: right; line-height: 1.1; min-width: 64px; }
+.owns b { font-family: var(--f-num); font-size: 1.15rem; display: block; }
+.owns span { font-size: .7rem; color: var(--muted); }
+details.more summary { cursor: pointer; font-size: .8rem; font-weight: 650; color: var(--muted); list-style: none; display: inline-flex; gap: 6px; align-items: center; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::before { content: '+'; font-weight: 900; width: 14px; text-align: center; }
+details.more[open] summary::before { content: '\2212'; }
+.morebody { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; margin-top: 10px; align-items: start; }
+.splitbar { display: flex; height: 14px; border-radius: 99px; overflow: hidden; background: var(--track); }
+.splitbar i { display: block; height: 100%; transition: width .3s; }
+.splithead { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.empty { color: var(--muted); font-size: .9rem; background: var(--surface); border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 16px; }
+
+/* levers */
+.levers { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+.lever { background: var(--surface); border: 2px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; align-content: start; transition: border-color .2s, box-shadow .2s; min-width: 0; }
+.lever.on { border-color: var(--accent); box-shadow: var(--lift); }
+.lever-h { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.lever-h h3 { margin: 0; font-size: 1rem; font-weight: 800; }
+.lever-h p { margin: 2px 0 0; font-size: .78rem; color: var(--muted); }
+.lever .ctls { display: grid; gap: 12px; }
+.lever:not(.on) .ctls { opacity: .55; }
+.lever .imp { border-top: 1px dashed var(--line); padding-top: 8px; }
+.lever .imp b { color: var(--ink); font-weight: 700; }
+.resrow { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+.resrow input[type=text] { border: 1px solid var(--line-strong); border-radius: 8px; padding: 5px 8px; background: var(--surface); width: 100%; min-width: 0; }
+.amt { display: flex; align-items: stretch; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; background: var(--surface); max-width: 200px; }
+.amt span { display: grid; place-items: center; padding: 0 9px; background: var(--sunk); color: var(--muted); font-size: .85rem; }
+.amt input { border: 0; padding: 6px 8px; width: 100%; min-width: 0; background: transparent; font-family: var(--f-num); outline: none; }
+
+/* saves */
+.saves { margin-top: 38px; }
+.sgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 14px; align-items: start; }
+.saverow { display: flex; gap: 8px; flex-wrap: wrap; }
+.saverow input { flex: 1 1 180px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 7px 10px; background: var(--surface); min-width: 0; }
+.slist { display: grid; gap: 6px; margin-top: 10px; }
+.sitem { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sitem .nm { font-weight: 700; overflow-wrap: anywhere; }
+.sitem .mt { font-size: .74rem; color: var(--muted); }
+.sitem input { width: 18px; height: 18px; accent-color: var(--accent); }
+.tablewrap { overflow-x: auto; }
+table.cmp { border-collapse: collapse; width: 100%; font-size: .85rem; }
+table.cmp th, table.cmp td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: right; }
+table.cmp th { font-size: .72rem; color: var(--muted); font-weight: 700; }
+table.cmp th.sc { text-align: center; color: var(--ink); font-size: .84rem; border-left: 1px solid var(--line); }
+table.cmp .l { text-align: left; }
+table.cmp .bl { border-left: 1px solid var(--line); }
+table.cmp td.n { font-family: var(--f-num); }
+textarea.io { width: 100%; min-height: 80px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px; background: var(--surface); font-family: var(--f-num); font-size: .76rem; }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: .7rem; font-weight: 800; color: var(--muted); }
+.ph { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ph h2 { margin: 0; font-size: 1.05rem; font-weight: 800; }
+.ph span { color: var(--muted); font-size: .82rem; }
+
+footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: .84rem; display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; }
+footer strong { color: var(--ink); }
+
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 11px; font-size: .88rem; display: flex; gap: 12px; align-items: center; box-shadow: var(--lift); z-index: 50; max-width: calc(100vw - 32px); }
+.toast button { background: none; border: 0; color: inherit; font-weight: 800; text-decoration: underline; padding: 0; }
+
+.mbar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: none; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px; transform: translateY(-110%); transition: transform .25s; }
+.mbar.show { transform: none; }
+.mbar .sb { display: flex; height: 18px; border-radius: 99px; overflow: hidden; background: var(--track); }
+.mbar .sb i { display: block; height: 100%; transition: width .3s; }
+.mbar .ml { display: flex; gap: 10px; overflow-x: auto; white-space: nowrap; font-size: .74rem; margin-top: 5px; font-family: var(--f-num); scrollbar-width: none; }
+.mbar .ml span { display: inline-flex; align-items: center; gap: 4px; }
+.dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex: none; }
+
+@media (max-width: 1000px) {
+  .game { grid-template-columns: minmax(0, 1fr); }
+  .board { position: static; max-height: none; overflow: visible; }
+  .mbar { display: block; }
+  .sgrid { grid-template-columns: minmax(0, 1fr); }
+  .score { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 0 18px; align-items: start; }
+  .score .donutside { grid-row: span 3; }
+}
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; }
+  .score { display: block; }
+  .donutwrap { max-width: 230px; }
+  .srow-main { grid-template-columns: 34px minmax(0, 1fr) auto; }
+  .srow-main .sl-cell { grid-column: 1 / -1; grid-row: 2; }
+  .levers, .cast { grid-template-columns: minmax(0, 1fr); }
+  .step-h h2 { font-size: 1.2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+
+<div class="mbar" id="mbar" aria-hidden="true"><div class="sb" id="mbarBar"></div><div class="ml" id="mbarLeg"></div></div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>TRACE <span>equity game</span></h1>
+      <p>Pick who joins Pranav, drag the split, flip the levers. The scoreboard shows every consequence the moment you move something. It shows outcomes only, never a suggestion.</p>
+    </div>
+    <div class="tb">
+      <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3 2 6l3 3"/><path d="M2.5 6H10a4 4 0 0 1 0 8H7"/></svg>Undo</button>
+      <button class="btn" id="redoBtn" title="Redo (Shift+Ctrl/Cmd+Z)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m11 3 3 3-3 3"/><path d="M13.5 6H6a4 4 0 0 0 0 8h3"/></svg>Redo</button>
+      <button class="btn" id="resetBtn" title="Back to today: Pranav 100%">Start over</button>
+      <a class="btn" href="#saves">Save &amp; compare</a>
+      <button class="btn" id="themeBtn">Theme: system</button>
+    </div>
+  </header>
+
+  <div class="game">
+    <aside class="board" aria-label="Scoreboard">
+      <div class="panel score" id="score">
+        <div class="donutside">
+          <div class="donutwrap"><svg id="donut" viewBox="-160 -160 320 320" role="img" aria-label="Ownership donut"></svg><div class="dcenter" id="dcenter"></div></div>
+          <div class="dleg">Outer ring: owned on paper · inner ring: earned so far</div>
+        </div>
+        <div class="rows" id="rows"></div>
+        <div class="salebox" id="salebox"></div>
+        <div class="thr">
+          <div><b>Decides</b> &gt;50% of votes passes ordinary resolutions (§47 GmbHG). <b>Tie</b> = exactly 50%.</div>
+          <div><b>Changes articles</b> ≥75% of votes, incl. capital increases (§53 GmbHG). <b>Blocks articles</b> &gt;25%.</div>
+        </div>
+      </div>
+      <div class="panel clock">
+        <div class="clock-top">
+          <button class="playbtn" id="playBtn" aria-label="Play the clock"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg></button>
+          <div class="clock-lab"><b id="clockMonth">Month 60</b><span id="clockSub">5 years after founding</span></div>
+        </div>
+        <input type="range" class="sl" id="monthRange" min="0" max="60" step="1" aria-label="Month">
+        <div class="ticks"><span>0</span><span>1 yr</span><span>2 yrs</span><span>3 yrs</span><span>4 yrs</span><span>5 yrs</span></div>
+      </div>
+      <div class="alerts" id="alerts"></div>
+    </aside>
+
+    <main class="play">
+      <section aria-labelledby="h1s">
+        <div class="step-h"><span class="n">1</span><div><h2 id="h1s">Pick the team</h2><p>Tap someone to bring them in, then choose their role. Each card previews the effect before you tap.</p></div></div>
+        <div class="cast" id="cast"></div>
+      </section>
+      <section aria-labelledby="h2s">
+        <div class="step-h"><span class="n">2</span><div><h2 id="h2s">Split the company</h2><p>Drag a slider: the others give or take. Lock someone to hold them still.</p></div></div>
+        <div class="splitbox" id="split"></div>
+      </section>
+      <section aria-labelledby="h3s">
+        <div class="step-h"><span class="n">3</span><div><h2 id="h3s">Pull the levers</h2><p>Flip a switch or move any control. Each lever shows exactly what it is doing right now.</p></div></div>
+        <div class="levers" id="levers"></div>
+      </section>
+    </main>
+  </div>
+
+  <section class="saves" id="saves" aria-labelledby="h4s">
+    <div class="step-h"><span class="n">4</span><div><h2 id="h4s">Save &amp; compare</h2><p>Keep setups side by side. Swap them with Zahra as JSON.</p></div></div>
+    <div class="sgrid">
+      <div class="panel">
+        <div class="saverow"><input id="scName" placeholder="Name this setup, e.g. 50/50 with vesting" aria-label="Setup name"><button class="btn primary" id="scSave">Save</button></div>
+        <div class="slist" id="scList"></div>
+        <div style="display:grid;gap:8px;margin-top:14px">
+          <div class="eyebrow">Swap with Zahra</div>
+          <div class="saverow">
+            <button class="btn" id="exDownload" hidden>Download JSON</button>
+            <button class="btn" id="exCopy">Copy JSON</button>
+            <label class="btn" for="imFile" style="cursor:pointer">Import file</label>
+            <input type="file" id="imFile" accept=".json,application/json" hidden>
+          </div>
+          <textarea class="io" id="ioText" placeholder="Paste exported JSON here, then press Import pasted JSON." aria-label="Setup JSON"></textarea>
+          <div class="saverow"><button class="btn" id="imPaste">Import pasted JSON</button></div>
+          <p class="hint" id="ioMsg"></p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2>Side by side</h2><span>tick 2–4 setups</span></div>
+        <div class="saverow" style="align-items:center;margin-bottom:10px">
+          <span class="seglab" style="margin:0">Payout if sold for</span>
+          <div class="amt"><span>€</span><input type="number" id="cmpPrice" min="0" step="1000000" aria-label="Sale price"></div>
+        </div>
+        <div id="cmpBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <strong>Not legal or tax advice. Have a start-up lawyer and a Steuerberater review before signing.</strong>
+    <span>Facts: Pranav owns 100% today, invested a little over €2,000 and built the prototype. Every other number is an example value until you move it.</span>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>/*ENGINE-START*/
+// Calculation engine. Pure functions, no DOM. Units are nominal shares: Pranav
+// starts with 25,000 (a €25,000 Stammkapital of €1 shares). Real shares carry
+// votes; virtual units (option pool, VSOP grants) only count economically.
+var EquityEngine = (function () {
+  'use strict';
+  var BASE = 25000;
+  var EPS = 1e-9;
+  var TINY = 1e-7;
+  var DATED = { founder: 1, credit: 1, cash: 1, pool: 1, vsop: 1, round: 1, leave: 1, exit: 1 };
+  var PREF = { none: [0, false], '1x': [1, false], '1xp': [1, true], '2x': [2, false] };
+
+  function num(x, d) { x = Number(x); return isFinite(x) ? x : (d === undefined ? 0 : d); }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+  function pct(x) { return (Math.round(x * 10) / 10).toFixed(1) + '%'; }
+  function eur(x) { return '€' + Math.round(x).toLocaleString('en-US'); }
+  function uniq(a) { var s = {}; return a.filter(function (x) { if (s[x]) return false; s[x] = 1; return true; }); }
+
+  // ---------- vesting ----------
+  function vestedFraction(lot, m) {
+    var v = lot.vest;
+    if (!v) return 1;
+    var tw = 1, f = 0;
+    v.tranches.forEach(function (t) {
+      tw -= t.w;
+      var at = null;
+      if (t.status === 'met') at = t.deadline;
+      else if (t.status === 'late' && v.rule === 'extend') at = t.deadline + v.ext;
+      if (at !== null && m >= at) f += t.w;
+    });
+    tw = Math.max(0, tw);
+    var tf, el = m - v.start;
+    if (v.months <= 0) tf = el >= 0 ? 1 : 0;
+    else tf = el < v.cliff ? 0 : clamp(el / v.months, 0, 1);
+    return clamp(f + tw * tf, 0, 1);
+  }
+
+  // ---------- ledger helpers ----------
+  function newCtx(state) {
+    var ctx = { holders: {}, order: [], lots: [], loans: [], reimb: [], prefs: {}, ft: {}, exits: [],
+      voting: { mode: 'shares', person: null, mult: 2, reserved: [] } };
+    (state.people || []).forEach(function (p) {
+      if (!p || !p.id || ctx.holders[p.id]) return;
+      ctx.holders[p.id] = { id: p.id, name: p.name || p.id, kind: 'person' };
+      ctx.order.push(p.id);
+    });
+    ctx.holders.pool = { id: 'pool', name: 'Option pool (unallocated)', kind: 'pool' };
+    var f = state.founder || (ctx.order[0]);
+    if (f && ctx.holders[f]) ctx.lots.push({ h: f, u: BASE, cls: 'real', src: 'base', prot: null, vest: null });
+    return ctx;
+  }
+  function sumLots(ctx, fn) { var s = 0; ctx.lots.forEach(function (l) { if (fn(l)) s += l.u; }); return s; }
+  function unitsOf(ctx, h, cls) { return sumLots(ctx, function (l) { return l.h === h && (!cls || l.cls === cls); }); }
+  function fd(ctx) { return sumLots(ctx, function () { return true; }); }
+  function realTotal(ctx) { return sumLots(ctx, function (l) { return l.cls === 'real'; }); }
+  function prune(ctx) { ctx.lots = ctx.lots.filter(function (l) { return l.u > TINY; }); }
+  function addLot(ctx, h, u, cls, src, prot) {
+    if (u > TINY) ctx.lots.push({ h: h, u: u, cls: cls, src: src, prot: prot || null, vest: null });
+  }
+  function take(ctx, h, u, filter) {
+    var ls = ctx.lots.filter(function (l) { return l.h === h && (!filter || filter(l)); });
+    var have = 0; ls.forEach(function (l) { have += l.u; });
+    if (have <= EPS || u <= 0) return 0;
+    var t = Math.min(u, have), f = t / have;
+    ls.forEach(function (l) { l.u *= (1 - f); });
+    prune(ctx);
+    return t;
+  }
+  function isPerson(ctx, h) { return !!(ctx.holders[h] && ctx.holders[h].kind === 'person'); }
+  function name(ctx, h) { return ctx.holders[h] ? ctx.holders[h].name : 'someone'; }
+  function share(ctx, u) { var F = fd(ctx); return F > EPS ? u / F * 100 : 0; }
+
+  // Where returned shares go: 'pool', 'cancel' or 'founders' (other people holding real shares, pro rata).
+  function send(ctx, fromH, u, cls, dest, src, st) {
+    if (u <= TINY) return;
+    if (dest === 'pool') { addLot(ctx, 'pool', u, 'virt', src); return; }
+    if (dest === 'cancel') return;
+    if (cls === 'virt') { st.notes.push('Returned virtual shares are cancelled; they cannot become founder shares.'); return; }
+    var others = ctx.order.filter(function (h) { return h !== fromH && isPerson(ctx, h) && unitsOf(ctx, h, 'real') > TINY; });
+    var w = [], tot = 0;
+    others.forEach(function (h) { var x = unitsOf(ctx, h, 'real'); w.push(x); tot += x; });
+    if (tot <= EPS) { addLot(ctx, 'pool', u, 'virt', src); st.notes.push('No other founder holds shares, so the returned shares go to the pool.'); return; }
+    others.forEach(function (h, i) { addLot(ctx, h, u * w[i] / tot, 'real', src); });
+  }
+
+  function voteWeights(ctx) {
+    var w = {}, tot = 0, v = ctx.voting;
+    ctx.order.forEach(function (h) {
+      var r = unitsOf(ctx, h, 'real'), x = 0;
+      if (r > TINY) {
+        if (v.mode === 'head') x = 1;
+        else if (v.mode === 'extra' && h === v.person) x = r * Math.max(1, num(v.mult, 1));
+        else x = r;
+      }
+      w[h] = x; tot += x;
+    });
+    return { w: w, tot: tot };
+  }
+  function snapshot(ctx) {
+    var F = fd(ctx), vw = voteWeights(ctx), out = {};
+    ctx.order.concat(['pool']).forEach(function (h) {
+      var u = unitsOf(ctx, h);
+      out[h] = { econ: F > EPS ? u / F * 100 : 0, vote: vw.tot > EPS && vw.w[h] ? vw.w[h] / vw.tot * 100 : 0 };
+    });
+    return out;
+  }
+  function diff(a, b) {
+    var out = [];
+    Object.keys(b).forEach(function (h) {
+      var pa = a[h] || { econ: 0, vote: 0 }, pb = b[h];
+      var de = pb.econ - pa.econ, dv = pb.vote - pa.vote;
+      if (Math.abs(de) >= 0.005 || Math.abs(dv) >= 0.005) out.push({ h: h, econ: de, vote: dv });
+    });
+    return out;
+  }
+
+  // ---------- split methods ----------
+  var METHODS = {
+    equal: 'Split equally',
+    time: 'Split by time committed',
+    score: 'Split by contribution scores',
+    pie: 'Slicing Pie',
+    typed: 'Split by typed numbers'
+  };
+  function splitWeights(method, parts) {
+    return parts.map(function (q) {
+      switch (method) {
+        case 'time': return Math.max(0, num(q.days)) * Math.max(0, num(q.months));
+        case 'score': return Math.max(0, num(q.score));
+        case 'pie': return Math.max(0, num(q.market) - num(q.paid)) * Math.max(0, num(q.pmonths)) * 2 + Math.max(0, num(q.cash)) * 4;
+        case 'typed': return Math.max(0, num(q.pct));
+        default: return 1;
+      }
+    });
+  }
+
+  // ---------- actions ----------
+  var A = {};
+
+  A.founder = function (ctx, p, st) {
+    if (p.mode === 'split') return split(ctx, p, st);
+    var to = p.to;
+    if (!isPerson(ctx, to)) { st.warn.push('Choose who receives the shares.'); return; }
+    var x = clamp(num(p.pct) / 100, 0, 1);
+    if (x <= 0) { st.notes.push('0% means nothing changes.'); return; }
+    var F = fd(ctx);
+    if (!p.from || p.from === 'new') {
+      if (x >= 0.999) { x = 0.999; st.warn.push('Newly issued shares cannot be 100% of the company. Capped at 99.9%.'); }
+      addLot(ctx, to, F > EPS ? F * x / (1 - x) : BASE, 'real', st.id);
+    } else {
+      if (!isPerson(ctx, p.from)) { st.warn.push('Choose who the shares come from.'); return; }
+      if (p.from === to) { st.warn.push('Giver and receiver are the same person, so nothing moves.'); return; }
+      var need = F * x, have = unitsOf(ctx, p.from, 'real');
+      if (need > have + 1e-6) st.warn.push(name(ctx, p.from) + ' holds only ' + pct(share(ctx, have)) + ' in real shares, so only that moves (asked for ' + pct(x * 100) + ').');
+      var t = take(ctx, p.from, need, function (l) { return l.cls === 'real'; });
+      addLot(ctx, to, t, 'real', st.id);
+    }
+    ctx.ft[to] = !!p.ft;
+  };
+
+  function split(ctx, p, st) {
+    var seen = {}, parts = [];
+    (p.parts || []).forEach(function (q) {
+      if (q && isPerson(ctx, q.id) && !seen[q.id]) { seen[q.id] = 1; parts.push(q); }
+    });
+    if (parts.length !== (p.parts || []).length) st.warn.push('A person appears twice or is missing. Each person counts once.');
+    if (!parts.length) { st.warn.push('Add at least one person to the split.'); return; }
+    var w = splitWeights(p.method, parts), W = 0;
+    w.forEach(function (x) { W += x; });
+    if (W <= EPS) { st.warn.push('All inputs are zero, so there is nothing to split by.'); return; }
+    if (p.method === 'typed' && Math.abs(W - 100) > 0.05) st.warn.push('Typed numbers add up to ' + pct(W) + ', not 100%. They are scaled to 100%.');
+    var unprot = function (l) { return l.cls === 'real' && !l.prot; };
+    var pooled = sumLots(ctx, function (l) { return seen[l.h] && unprot(l); });
+    if (pooled <= EPS) { st.warn.push('The people in this split hold no founder shares at this point. Include the current holder (for example Pranav).'); return; }
+    ctx.lots = ctx.lots.filter(function (l) { return !(seen[l.h] && unprot(l)); });
+    parts.forEach(function (q, i) { addLot(ctx, q.id, pooled * w[i] / W, 'real', st.id); ctx.ft[q.id] = !!q.ft; });
+    if (p.method === 'pie') st.notes.push('Slices: ' + parts.map(function (q, i) { return name(ctx, q.id) + ' ' + Math.round(w[i]).toLocaleString('en-US'); }).join(' · '));
+    if (sumLots(ctx, function (l) { return l.prot && seen[l.h]; }) > TINY || parts.length > 1)
+      st.notes.push('Founder shares divided ' + parts.map(function (q, i) { return name(ctx, q.id) + ' ' + pct(w[i] / W * 100); }).join(' · ') + '. Past-work credit and shares bought with cash are kept outside the split.');
+  }
+
+  A.credit = function (ctx, p, st) {
+    var h = p.person;
+    if (!isPerson(ctx, h)) { st.warn.push('Choose whose past work is credited.'); return; }
+    var F = fd(ctx), n;
+    if (p.mode === 'value') {
+      var val = num(p.valuation), v = Math.max(0, num(p.value));
+      if (val <= 0) { st.warn.push('Company valuation must be above €0.'); return; }
+      n = F > EPS ? F * v / val : BASE;
+      st.notes.push('At ' + eur(val) + ' before this credit, ' + eur(v) + ' of past work is ' + pct(v / (val + v) * 100) + ' of the company.');
+    } else {
+      var x = num(p.pct) / 100;
+      if (x >= 0.999) { x = 0.999; st.warn.push('Credit cannot be 100% of the company. Capped at 99.9%.'); }
+      x = Math.max(0, x);
+      n = F > EPS ? F * x / (1 - x) : BASE;
+    }
+    var aloneBefore = ctx.lots.length > 0 && ctx.lots.every(function (l) { return l.h === h; });
+    addLot(ctx, h, n, 'real', st.id, 'credit');
+    if (aloneBefore && n > TINY) st.notes.push(name(ctx, h) + ' already owns everything, so the table does not move yet. This part is kept out of later splits.');
+  };
+
+  A.cash = function (ctx, p, st) {
+    var h = p.person, amt = Math.max(0, num(p.amount));
+    if (!isPerson(ctx, h)) { st.warn.push('Choose who puts in the cash.'); return; }
+    if (p.mode === 'equity') {
+      var val = num(p.valuation);
+      if (val <= 0) { st.warn.push('Company valuation must be above €0.'); return; }
+      var F = fd(ctx);
+      addLot(ctx, h, F > EPS ? F * amt / val : BASE, 'real', st.id, 'cash');
+      st.notes.push(eur(amt) + ' at ' + eur(val) + ' pre-money buys ' + pct(amt / (val + amt) * 100) + '.');
+    } else if (p.mode === 'expense') {
+      ctx.reimb.push({ h: h, amount: amt, src: st.id });
+      st.notes.push('No change in ownership. The company pays ' + eur(amt) + ' back to ' + name(ctx, h) + ' as an expense, once it has the money.');
+    } else {
+      ctx.loans.push({ h: h, amount: amt, rate: Math.max(0, num(p.rate)), month: num(p.month), src: st.id });
+      st.notes.push('No change in ownership. In a sale, ' + eur(amt) + (num(p.rate) > 0 ? ' plus interest' : '') + ' is repaid to ' + name(ctx, h) + ' before shareholders are paid.');
+    }
+  };
+
+  A.pool = function (ctx, p, st) {
+    var t = num(p.target) / 100;
+    if (t > 0.95) { t = 0.95; st.warn.push('Pool capped at 95%.'); }
+    t = Math.max(0, t);
+    var F = fd(ctx), P = unitsOf(ctx, 'pool');
+    var a = (t * F - P) / (1 - t);
+    if (a <= TINY) { st.notes.push('The unallocated pool is already ' + pct(share(ctx, P)) + ', so nothing is added.'); return; }
+    addLot(ctx, 'pool', a, 'virt', st.id);
+    st.notes.push('Virtual shares: they reduce economic ownership, not votes.');
+  };
+
+  A.vsop = function (ctx, p, st) {
+    var h = p.person;
+    if (!isPerson(ctx, h)) { st.warn.push('Choose who receives the virtual shares.'); return; }
+    var x = Math.max(0, num(p.pct) / 100), F = fd(ctx), P = unitsOf(ctx, 'pool'), n = F * x;
+    if (n <= TINY) { st.notes.push('0% means nothing changes.'); return; }
+    if (P <= TINY) { st.warn.push('No unallocated pool at this point. Add an option pool action above this grant.'); return; }
+    if (n > P + 1e-6) {
+      st.warn.push('Grant of ' + pct(x * 100) + ' is larger than the pool (' + pct(share(ctx, P)) + ' left). Only ' + pct(share(ctx, P)) + ' is granted.');
+      n = P;
+    }
+    take(ctx, 'pool', n);
+    addLot(ctx, h, n, 'virt', st.id);
+  };
+
+  A.vesting = function (ctx, p, st, m) {
+    var h = p.person;
+    if (!isPerson(ctx, h)) { st.warn.push('Choose whose shares vest.'); return; }
+    var lots = ctx.lots.filter(function (l) { return l.h === h && (p.inclProt || !l.prot); });
+    if (!lots.length) { st.warn.push(name(ctx, h) + ' holds no shares at this point, so this vesting covers nothing. Move it below the action that gives them shares.'); return; }
+    var ms = (p.ms || []).map(function (q) {
+      return { name: q.name || 'Milestone', w: clamp(num(q.weight) / 100, 0, 1), deadline: num(q.deadline), status: q.status || 'open' };
+    });
+    var W = 0; ms.forEach(function (q) { W += q.w; });
+    if (W > 1 + 1e-9) { st.warn.push('Milestone weights add up to ' + pct(W * 100) + '. They are scaled to 100%.'); ms.forEach(function (q) { q.w /= W; }); }
+    var rule = p.rule === 'founders' || p.rule === 'extend' ? p.rule : 'pool';
+    var replaced = false, u = 0;
+    lots.forEach(function (l) {
+      if (l.vest) replaced = true;
+      u += l.u;
+      l.vest = { start: num(p.start), months: Math.max(0, num(p.years) * 12), cliff: Math.max(0, num(p.cliff)), ext: Math.max(0, num(p.ext)), rule: rule, tranches: copy(ms) };
+    });
+    st.notes.push('Covers ' + pct(share(ctx, u)) + ' held by ' + name(ctx, h) + (replaced ? '; replaces earlier vesting on these shares.' : '.'));
+    forfeit(ctx, lots, m, st);
+  };
+
+  function forfeit(ctx, lots, m, st) {
+    var lost = {};
+    lots.forEach(function (l) {
+      var v = l.vest;
+      if (!v) return;
+      var i = 0;
+      while (i < v.tranches.length) {
+        var t = v.tranches[i];
+        var missed = t.status === 'missed' || (t.status === 'late' && v.rule !== 'extend');
+        var at = t.deadline + (v.rule === 'extend' ? v.ext : 0);
+        if (missed && at <= m) {
+          var removed = l.u * t.w, rem = 1 - t.w;
+          l.u -= removed;
+          v.tranches.splice(i, 1);
+          if (rem > EPS) v.tranches.forEach(function (o) { o.w /= rem; });
+          lost[t.name] = (lost[t.name] || 0) + removed;
+          send(ctx, l.h, removed, l.cls, v.rule === 'founders' ? 'founders' : 'pool', st.id, st);
+          if (rem <= EPS) break;
+        } else i++;
+      }
+    });
+    prune(ctx);
+    var dest = lots[0] && lots[0].vest && lots[0].vest.rule === 'founders' ? 'the other founders' : 'the pool';
+    Object.keys(lost).forEach(function (k) { st.notes.push('Missed “' + k + '”: ' + pct(share(ctx, lost[k])) + ' goes to ' + dest + '.'); });
+  }
+
+  A.round = function (ctx, p, st) {
+    var amt = Math.max(0, num(p.amount)), val = num(p.valuation);
+    var pre = p.valType === 'post' ? val - amt : val;
+    if (amt <= 0) { st.warn.push('Amount raised must be above €0.'); return; }
+    if (pre <= 0) { st.warn.push(p.valType === 'post' ? 'Post-money valuation must be larger than the amount raised.' : 'Pre-money valuation must be above €0.'); return; }
+    var post = pre + amt, F = fd(ctx), P = unitsOf(ctx, 'pool');
+    var t = Math.max(0, num(p.poolTarget) / 100);
+    if (t > 0) {
+      var k = t * post / pre;
+      if (k >= 1 || t > 0.9) st.warn.push('Pool target is too large for this round. No top-up applied.');
+      else {
+        var add = (k * F - P) / (1 - k);
+        if (add > TINY) { addLot(ctx, 'pool', add, 'virt', st.id); st.notes.push('Pool topped up to ' + pct(t * 100) + ' of post-money before the round, so existing holders carry that dilution.'); }
+        else st.notes.push('Pool is already at or above ' + pct(t * 100) + ' of post-money; no top-up.');
+      }
+    }
+    F = fd(ctx);
+    var N = F > EPS ? F * amt / pre : BASE;
+    var id = 'inv_' + st.id;
+    if (!ctx.holders[id]) { ctx.holders[id] = { id: id, name: p.name || 'Investors', kind: 'investor' }; ctx.order.push(id); }
+    addLot(ctx, id, N, 'real', st.id);
+    ctx.prefs[id] = (ctx.prefs[id] || 0) + amt;
+    st.notes.push('Post-money ' + eur(post) + '. Price €' + (F > EPS ? (pre / F) : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' per share.');
+  };
+
+  A.leave = function (ctx, p, st) {
+    var h = p.person;
+    if (!isPerson(ctx, h)) { st.warn.push('Choose who leaves.'); return; }
+    var L = num(p.month);
+    var lots = ctx.lots.filter(function (l) { return l.h === h; });
+    if (!lots.length) { st.warn.push(name(ctx, h) + ' holds nothing at this point.'); return; }
+    var keepF = p.kind === 'bad' ? clamp(num(p.keep) / 100, 0, 1) : 1;
+    var anyVest = lots.some(function (l) { return !!l.vest; });
+    var F0 = fd(ctx), before = 0, ret = 0;
+    lots.forEach(function (l) {
+      before += l.u;
+      var k = vestedFraction(l, L) * keepF, r = l.u * (1 - k);
+      l.u *= k; l.vest = null; ret += r;
+      send(ctx, h, r, l.cls, p.to || 'pool', st.id, st);
+    });
+    prune(ctx);
+    if (!anyVest) st.notes.push('No vesting is set for ' + name(ctx, h) + ', so all of it counts as vested.');
+    st.notes.push(name(ctx, h) + ' keeps ' + pct((before - ret) / F0 * 100) + ' of the ' + pct(before / F0 * 100) + ' held before leaving.');
+  };
+
+  A.exit = function (ctx, p, st) {
+    var r = waterfall(ctx, p);
+    ctx.exits.push({ id: st.id, p: copy(p), res: r });
+    r.warn.forEach(function (w) { st.warn.push(w); });
+    st.notes.push('Payout per person is shown under “Sale payout”.');
+  };
+
+  A.voting = function (ctx, p, st) {
+    ctx.voting = { mode: p.mode || 'shares', person: p.person, mult: Math.max(1, num(p.mult, 2)), reserved: copy(p.reserved || []) };
+    if (p.mode === 'extra' && !isPerson(ctx, p.person)) st.warn.push('Choose who gets the extra votes.');
+  };
+
+  // ---------- sale waterfall ----------
+  function waterfall(ctx, p) {
+    var price = Math.max(0, num(p.price)), M = num(p.month, 60);
+    var pr = PREF[p.pref] || PREF.none, mult = pr[0], part = pr[1];
+    var hu = {}, out = {}, warn = [], unpaid = 0;
+    ctx.lots.forEach(function (l) {
+      if (l.h === 'pool') return;
+      var u = l.u * (p.unvested === 'forfeit' ? vestedFraction(l, M) : 1);
+      if (u > 0) hu[l.h] = (hu[l.h] || 0) + u;
+    });
+    function row(h) { return out[h] || (out[h] = { h: h, loan: 0, pref: 0, common: 0, total: 0 }); }
+    var left = price;
+    var dues = ctx.loans.map(function (L) { return { h: L.h, due: L.amount * (1 + L.rate / 100 * Math.max(0, M - L.month) / 12) }; });
+    var D = 0; dues.forEach(function (d) { D += d.due; });
+    var payL = Math.min(left, D);
+    dues.forEach(function (d) { if (D > 0) row(d.h).loan += payL * d.due / D; });
+    left -= payL;
+    if (D > price + 1e-6) warn.push('The sale price does not cover the founder loans (' + eur(D) + ').');
+    function common(amount, holders) {
+      var tu = 0; holders.forEach(function (h) { tu += hu[h]; });
+      if (tu <= EPS) { unpaid += amount; return; }
+      holders.forEach(function (h) { row(h).common += amount * hu[h] / tu; });
+    }
+    var all = Object.keys(hu);
+    var inv = Object.keys(ctx.prefs).filter(function (h) { return ctx.prefs[h] > 0 && mult > 0; });
+    if (!inv.length) common(left, all);
+    else if (part) {
+      var P = 0; inv.forEach(function (h) { P += ctx.prefs[h] * mult; });
+      var pay = Math.min(left, P);
+      inv.forEach(function (h) { row(h).pref += pay * ctx.prefs[h] * mult / P; });
+      left -= pay;
+      common(left, all);
+    } else {
+      // Non-participating: each investor takes the larger of its preference or converting.
+      // Sorting by preference per share gives the stable split.
+      var list = inv.map(function (h) { return { h: h, pref: ctx.prefs[h] * mult, u: hu[h] || 0 }; });
+      var ratio = function (c) { return c.u > EPS ? c.pref / c.u : Infinity; };
+      list.sort(function (a, b) { return ratio(a) - ratio(b); });
+      var chosen = 0;
+      for (var k = 0; k <= list.length; k++) {
+        var keep = list.slice(k), conv = list.slice(0, k), Pk = 0;
+        keep.forEach(function (c) { Pk += c.pref; });
+        var res = left - Pk;
+        if (res < 0) { chosen = k; break; }
+        var keepSet = {}; keep.forEach(function (c) { keepSet[c.h] = 1; });
+        var Uc = 0; all.forEach(function (h) { if (!keepSet[h]) Uc += hu[h]; });
+        var v = Uc > EPS ? res / Uc : (res > EPS ? Infinity : 0);
+        var ok = conv.every(function (c) { return c.pref <= c.u * v + 1e-6; }) && keep.every(function (c) { return c.pref >= c.u * v - 1e-6; });
+        if (ok || k === list.length) { chosen = k; break; }
+      }
+      var keepL = list.slice(chosen), P2 = 0;
+      keepL.forEach(function (c) { P2 += c.pref; });
+      var pay2 = Math.min(left, P2);
+      keepL.forEach(function (c) { if (P2 > 0) row(c.h).pref += pay2 * c.pref / P2; });
+      left -= pay2;
+      common(left, all.filter(function (h) { return !keepL.some(function (c) { return c.h === h; }); }));
+    }
+    if (unpaid > 0.5) warn.push(eur(unpaid) + ' of the sale price has no shareholder to go to.');
+    Object.keys(out).forEach(function (h) { var r = out[h]; r.total = r.loan + r.pref + r.common; });
+    return { price: price, rows: out, loans: D, unpaid: unpaid, warn: warn, month: M, pref: p.pref || 'none', unvested: p.unvested || 'accelerate' };
+  }
+
+  // ---------- control ----------
+  function control(v) {
+    var c = [];
+    if (v > 50 + 1e-6) c.push('decides');
+    else if (Math.abs(v - 50) <= 1e-6) c.push('tie');
+    if (v >= 75 - 1e-6) c.push('articles');
+    else if (v > 25 + 1e-6) c.push('blocks');
+    return c;
+  }
+  function reservedBlockers(rows, matter) {
+    var voters = rows.filter(function (r) { return r.vote > 1e-6; });
+    if (matter.rule === 'consent') return voters.length || rows.some(function (r) { return r.id === matter.person; }) ? [matter.person] : [];
+    if (matter.rule === 'pct') {
+      var need = clamp(num(matter.pct, 75), 0, 100);
+      return voters.filter(function (r) { return r.vote > 100 - need + 1e-6; }).map(function (r) { return r.id; });
+    }
+    return voters.map(function (r) { return r.id; });
+  }
+
+  // ---------- run ----------
+  function run(state, opt) {
+    opt = opt || {};
+    var m = opt.month === undefined ? Infinity : opt.month;
+    var ctx = newCtx(state), steps = [], warnings = [], prev = snapshot(ctx);
+    var maxMonth = -Infinity, exitIdx = -1;
+    (state.actions || []).forEach(function (a, i) {
+      var st = { id: a.id, idx: i, notes: [], warn: [], info: [], delta: [] };
+      steps.push(st);
+      if (!a.on) { st.off = true; return; }
+      var p = a.p || {};
+      if (DATED[a.type] && num(p.month) > m) { st.later = true; return; }
+      if (DATED[a.type]) {
+        if (num(p.month) < maxMonth - EPS) st.info.push('Dated earlier than an action above it. Actions apply in list order.');
+        maxMonth = Math.max(maxMonth, num(p.month));
+      }
+      if (exitIdx >= 0 && a.type !== 'voting') st.info.push('Comes after the sale in action ' + (exitIdx + 1) + '; that payout does not include it.');
+      var fn = A[a.type];
+      if (!fn) { st.warn.push('Unknown action type.'); return; }
+      st.id = a.id;
+      fn(ctx, p, st, m);
+      if (a.type === 'exit') exitIdx = i;
+      var now = snapshot(ctx);
+      st.delta = diff(prev, now);
+      prev = now;
+      st.notes = uniq(st.notes); st.warn = uniq(st.warn);
+      st.warn.forEach(function (w) { warnings.push({ id: a.id, idx: i, text: w }); });
+    });
+
+    var F = fd(ctx), vw = voteWeights(ctx);
+    var rows = ctx.order.concat(['pool']).map(function (h) {
+      var u = unitsOf(ctx, h), real = unitsOf(ctx, h, 'real'), vested = 0;
+      if (m !== Infinity) ctx.lots.forEach(function (l) { if (l.h === h) vested += l.u * (h === 'pool' ? 1 : vestedFraction(l, m)); });
+      return {
+        id: h, name: ctx.holders[h].name, kind: ctx.holders[h].kind, units: u, real: real, virt: u - real,
+        econ: F > EPS ? u / F * 100 : 0,
+        vote: vw.tot > EPS ? (vw.w[h] || 0) / vw.tot * 100 : 0,
+        earned: m !== Infinity ? (F > EPS ? vested / F * 100 : 0) : null,
+        vesting: ctx.lots.some(function (l) { return l.h === h && !!l.vest; }),
+        ft: !!ctx.ft[h]
+      };
+    });
+    var sumE = 0, sumV = 0;
+    rows.forEach(function (r) { sumE += r.econ; sumV += r.vote; });
+    if (F <= EPS) warnings.push({ id: null, idx: -1, text: 'Nobody holds any shares in this scenario.' });
+    else if (Math.abs(sumE - 100) > 1e-6) warnings.push({ id: null, idx: -1, text: 'Economic ownership adds up to ' + sumE.toFixed(4) + '%, not 100%.' });
+    if (F > EPS && vw.tot <= EPS) warnings.push({ id: null, idx: -1, text: 'Nobody holds real shares, so nobody can vote.' });
+    else if (vw.tot > EPS && Math.abs(sumV - 100) > 1e-6) warnings.push({ id: null, idx: -1, text: 'Votes add up to ' + sumV.toFixed(4) + '%, not 100%.' });
+
+    // EXIST founder grant (rule as stated in the brief: max three full-time founders, split fixed up front)
+    var ftList = ctx.order.filter(function (h) { return ctx.ft[h] && isPerson(ctx, h) && unitsOf(ctx, h, 'real') > TINY; });
+    var later = [];
+    (state.actions || []).forEach(function (a, i) {
+      if (!a.on) return;
+      var p = a.p || {};
+      if (a.type === 'founder' && num(p.month) > 0) later.push('Action ' + (i + 1) + ' gives founder shares at month ' + num(p.month) + '.');
+      if (a.type === 'founder' && p.mode === 'split' && p.method === 'pie') later.push('Action ' + (i + 1) + ' uses Slicing Pie, which is designed to keep changing.');
+      if (a.type === 'vesting' && (p.ms || []).length && ctx.ft[p.person]) later.push('Action ' + (i + 1) + ': ' + name(ctx, p.person) + '’s shares depend on milestones.');
+    });
+    var exist = { names: ftList.map(function (h) { return name(ctx, h); }), count: ftList.length, over: ftList.length > 3, later: later };
+
+    return { rows: rows, steps: steps, warnings: warnings, exits: ctx.exits, loans: ctx.loans, reimb: ctx.reimb,
+      voting: ctx.voting, exist: exist, fd: F, holders: ctx.holders, month: m, ctx: ctx };
+  }
+
+  function payoutAt(state, price) {
+    var r = run(state), last = r.exits[r.exits.length - 1];
+    var p = last ? copy(last.p) : { pref: 'none', unvested: 'accelerate', month: 60 };
+    p.price = price;
+    return { res: waterfall(r.ctx, p), run: r, usedExit: !!last };
+  }
+
+  return { run: run, payoutAt: payoutAt, waterfall: waterfall, vestedFraction: vestedFraction, control: control,
+    reservedBlockers: reservedBlockers, METHODS: METHODS, splitWeights: splitWeights, BASE: BASE, DATED: DATED };
+})();
+if (typeof module !== 'undefined') module.exports = EquityEngine;
+/*ENGINE-END*/
+</script>
+<script>/*BUILDER-START*/
+// Turns the game board (team, sliders, levers) into an ordered list of engine actions.
+var GameBuilder = (function () {
+  'use strict';
+  var CAST = [
+    { id: 'pranav', name: 'Pranav', full: 'Pranav', blurb: 'Founder. Built the prototype alone and put in a little over €2,000. Owns 100% today.' },
+    { id: 'zahra', name: 'Zahra', full: 'Zahra Abbasi', blurb: 'Chosen co-founder. Business side: digital health, product, funding.' },
+    { id: 'ahmed', name: 'Ahmed', full: 'Ahmed Alshembari', blurb: 'ML researcher. Possible technical co-founder or first hire.' },
+    { id: 'florian', name: 'Florian', full: 'Florian Nick', blurb: 'Former start-up CTO. Possible part-time co-founder (1–2 days a week) or advisor.' }
+  ];
+  var IDS = CAST.map(function (c) { return c.id; });
+  var ROLES = { ft: 'Full-time co-founder', pt: 'Part-time co-founder', hire: 'First hire', adv: 'Advisor' };
+  var GRANT_DEFAULT = { hire: { pct: 3, start: 3, years: 4, cliff: 12 }, adv: { pct: 1, start: 0, years: 2, cliff: 3 } };
+
+  function num(x, d) { x = Number(x); return isFinite(x) ? x : (d === undefined ? 0 : d); }
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function defaults() {
+    return {
+      v: 2,
+      team: { pranav: { in: true, role: 'ft' }, zahra: { in: false, role: 'ft' }, ahmed: { in: false, role: 'ft' }, florian: { in: false, role: 'pt' } },
+      split: { pranav: 100, zahra: 0, ahmed: 0, florian: 0 },
+      lock: {},
+      grant: { zahra: copy(GRANT_DEFAULT.hire), ahmed: copy(GRANT_DEFAULT.hire), florian: copy(GRANT_DEFAULT.adv) },
+      ms: { pranav: { stake: 0, deadline: 18, status: 'open' }, zahra: { stake: 0, deadline: 18, status: 'open' }, ahmed: { stake: 0, deadline: 18, status: 'open' }, florian: { stake: 0, deadline: 18, status: 'open' } },
+      credit: { on: false, pct: 10 },
+      cash: { mode: 'none', amount: 2000, valuation: 500000 },
+      vest: { on: false, years: 4, cliff: 12, backdate: 0, rule: 'pool', ext: 3 },
+      pool: { on: false, pct: 10 },
+      round: { on: false, amount: 500000, pre: 4000000, topup: 0, month: 12 },
+      leave: { on: false, who: 'zahra', month: 18, kind: 'good', to: 'pool' },
+      sale: { on: false, price: 10000000, pref: '1x', month: 60, unvested: 'accelerate' },
+      vote: { mode: 'shares', who: 'pranav', mult: 2, reserved: [] },
+      month: 60,
+      touched: {}
+    };
+  }
+  function isFounderRole(r) { return r === 'ft' || r === 'pt'; }
+  function founders(G) { return IDS.filter(function (id) { var t = G.team[id]; return t && t.in && isFounderRole(t.role); }); }
+  function grantees(G) { return IDS.filter(function (id) { var t = G.team[id]; return t && t.in && id !== 'pranav' && !isFounderRole(t.role); }); }
+  function inTeam(G, id) { return !!(G.team[id] && G.team[id].in); }
+
+  // Linked sliders: set one founder's share of the founder split; unlocked others absorb the change pro rata.
+  function setSplit(G, id, v) {
+    var fs = founders(G);
+    if (fs.indexOf(id) < 0) return;
+    var locked = 0, others = [];
+    fs.forEach(function (f) { if (f === id) return; if (G.lock[f]) locked += num(G.split[f]); else others.push(f); });
+    if (!others.length) { G.split[id] = Math.max(0, 100 - locked); return; }
+    v = Math.max(0, Math.min(100 - locked, num(v)));
+    var O = 0; others.forEach(function (f) { O += Math.max(0, num(G.split[f])); });
+    var R = 100 - locked - v;
+    others.forEach(function (f) { G.split[f] = O > 1e-9 ? Math.max(0, num(G.split[f])) * R / O : R / others.length; });
+    G.split[id] = v;
+  }
+  function equalize(G) {
+    var fs = founders(G);
+    IDS.forEach(function (id) { G.split[id] = fs.indexOf(id) >= 0 ? 100 / fs.length : 0; });
+    G.lock = {};
+  }
+
+  function build(G, opt) {
+    opt = opt || {};
+    var off = opt.off || {};
+    var Gx = copy(G);
+    if (opt.without && opt.without !== 'pranav' && Gx.team[opt.without]) Gx.team[opt.without].in = false;
+    var fs = founders(Gx), gs = grantees(Gx);
+    var A = [];
+    function add(id, type, p) { A.push({ id: id, type: type, on: true, p: p }); }
+
+    if (!off.credit && Gx.credit.on && num(Gx.credit.pct) > 0) add('g_credit', 'credit', { person: 'pranav', mode: 'pct', pct: num(Gx.credit.pct), month: 0 });
+    var S = 0; fs.forEach(function (id) { S += Math.max(0, num(Gx.split[id])); });
+    add('g_split', 'founder', { mode: 'split', method: 'typed', month: 0, parts: fs.map(function (id) {
+      return { id: id, ft: Gx.team[id].role === 'ft', pct: S > 1e-9 ? Math.max(0, num(Gx.split[id])) / S * 100 : 100 / fs.length };
+    }) });
+    if (!off.cash && Gx.cash.mode !== 'none') add('g_cash', 'cash', { person: 'pranav', amount: num(Gx.cash.amount), mode: Gx.cash.mode === 'shares' ? 'equity' : Gx.cash.mode, rate: 0, valuation: num(Gx.cash.valuation), month: 0 });
+    if (!off.pool && Gx.pool.on) add('g_pool', 'pool', { target: num(Gx.pool.pct), month: 0 });
+    gs.forEach(function (id) {
+      var g = Gx.grant[id] || GRANT_DEFAULT.hire;
+      add('g_vsop_' + id, 'vsop', { person: id, pct: num(g.pct), month: num(g.start) });
+      add('g_gvest_' + id, 'vesting', { person: id, years: num(g.years), cliff: num(g.cliff), start: num(g.start), ms: [], rule: 'pool' });
+    });
+    var vestOn = !off.vest && Gx.vest.on;
+    fs.forEach(function (id) {
+      var m = Gx.ms[id], hasMs = !off.ms && m && num(m.stake) > 0;
+      if (!vestOn && !hasMs) return;
+      add('g_vest_' + id, 'vesting', {
+        person: id, years: vestOn ? num(Gx.vest.years) : 0, cliff: vestOn ? num(Gx.vest.cliff) : 0,
+        start: vestOn && id === 'pranav' ? -num(Gx.vest.backdate) : 0, inclProt: false,
+        ms: hasMs ? [{ name: 'Milestone', weight: num(m.stake), deadline: num(m.deadline), status: m.status || 'open' }] : [],
+        rule: Gx.vest.rule, ext: num(Gx.vest.ext)
+      });
+    });
+    if (!off.round && Gx.round.on) add('g_round', 'round', { name: 'Investors', amount: num(Gx.round.amount), valType: 'pre', valuation: num(Gx.round.pre), poolTarget: num(Gx.round.topup), month: num(Gx.round.month) });
+    if (!off.leave && Gx.leave.on && inTeam(Gx, Gx.leave.who)) add('g_leave', 'leave', { person: Gx.leave.who, month: num(Gx.leave.month), kind: Gx.leave.kind, keep: 0, to: Gx.leave.to });
+    if (!off.sale && Gx.sale.on) add('g_sale', 'exit', { price: num(Gx.sale.price), pref: Gx.sale.pref, month: num(Gx.sale.month), unvested: Gx.sale.unvested });
+    var reserved = (Gx.vote.reserved || []).filter(function (r) { return r.rule !== 'consent' || inTeam(Gx, r.person); });
+    if (!off.vote && (Gx.vote.mode !== 'shares' || reserved.length)) {
+      add('g_vote', 'voting', { mode: Gx.vote.mode === 'extra' && !inTeam(Gx, Gx.vote.who) ? 'shares' : Gx.vote.mode, person: Gx.vote.who, mult: num(Gx.vote.mult, 2), reserved: reserved });
+    }
+    return { founder: 'pranav', people: CAST.map(function (c) { return { id: c.id, name: c.name }; }), actions: A };
+  }
+
+  // Repair anything a stored or imported board might be missing.
+  function normalize(x) {
+    var G = defaults();
+    if (!x || typeof x !== 'object') return G;
+    Object.keys(G).forEach(function (k) {
+      if (x[k] === undefined) return;
+      if (G[k] && typeof G[k] === 'object' && !Array.isArray(G[k])) {
+        Object.keys(G[k]).forEach(function (j) {
+          if (x[k][j] === undefined) return;
+          if (G[k][j] && typeof G[k][j] === 'object' && !Array.isArray(G[k][j])) G[k][j] = Object.assign(G[k][j], x[k][j]);
+          else G[k][j] = x[k][j];
+        });
+        if (k === 'lock' || k === 'touched') G[k] = Object.assign({}, x[k]);
+      } else G[k] = x[k];
+    });
+    G.team.pranav.in = true;
+    if (!isFounderRole(G.team.pranav.role)) G.team.pranav.role = 'ft';
+    if (!Array.isArray(G.vote.reserved)) G.vote.reserved = [];
+    return G;
+  }
+
+  return { CAST: CAST, IDS: IDS, ROLES: ROLES, GRANT_DEFAULT: GRANT_DEFAULT, defaults: defaults, founders: founders, grantees: grantees,
+    isFounderRole: isFounderRole, setSplit: setSplit, equalize: equalize, build: build, normalize: normalize };
+})();
+if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
+/*BUILDER-END*/
+</script>
+<script>
+(function () {
+  'use strict';
+  var E = EquityEngine, B = GameBuilder;
+  var LS = 'trace-equity-game-v2';
+  var COLOR = { pranav: 'var(--c0)', zahra: 'var(--c1)', ahmed: 'var(--c2)', florian: 'var(--c3)' };
+  var CASTBY = {}; B.CAST.forEach(function (c) { CASTBY[c.id] = c; });
+
+  // ---------- state ----------
+  var G = B.defaults();
+  var store = { saves: [], ui: { theme: 'system', cmp: ['working'], cmpPrice: 10000000, open: {} } };
+  var hist = [], fut = [], burst = null;
+  try {
+    var d0 = JSON.parse(localStorage.getItem(LS) || 'null');
+    if (d0) {
+      if (d0.G) G = B.normalize(d0.G);
+      if (Array.isArray(d0.saves)) store.saves = d0.saves.filter(function (s) { return s && s.name && s.G; }).map(function (s) { return { id: s.id || ('s' + Math.random().toString(36).slice(2, 9)), name: s.name, at: s.at, G: B.normalize(s.G) }; });
+      if (d0.ui) Object.assign(store.ui, d0.ui);
+    }
+  } catch (e) { /* storage unavailable */ }
+  var saveT = null;
+  function persist() {
+    clearTimeout(saveT);
+    saveT = setTimeout(function () { try { localStorage.setItem(LS, JSON.stringify({ v: 2, G: G, saves: store.saves, ui: store.ui })); } catch (e) { /* ignore */ } }, 250);
+  }
+
+  // ---------- helpers ----------
+  function $(s) { return document.querySelector(s); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function uid() { return 's' + Math.random().toString(36).slice(2, 9); }
+  function n(x) { x = Number(x); return isFinite(x) ? x : 0; }
+  function pct(x) { return x > 0 && x < 0.05 ? '<0.1%' : x.toFixed(1) + '%'; }
+  function dpct(x) { return (x < 0 ? '−' : '+') + Math.abs(x).toFixed(1) + '%'; }
+  function eur(x) { return '€' + Math.round(x).toLocaleString('en-US'); }
+  function eurS(x) {
+    var a = Math.abs(x);
+    if (a >= 1e6) return '€' + (x / 1e6).toLocaleString('en-US', { maximumFractionDigits: a >= 1e7 ? 1 : 2 }) + 'M';
+    if (a >= 1e3) return '€' + (x / 1e3).toLocaleString('en-US', { maximumFractionDigits: 0 }) + 'k';
+    return '€' + Math.round(x);
+  }
+  function months(m) { m = Math.round(n(m)); return m === 1 ? '1 month' : m + ' months'; }
+  function getP(o, p) { return p.split('.').reduce(function (x, k) { return x == null ? undefined : x[k]; }, o); }
+  function setP(o, p, v) { var ks = p.split('.'), l = ks.pop(); var t = ks.reduce(function (x, k) { return x == null ? x : x[k]; }, o); if (t) t[l] = v; }
+  function nameOf(id, holders) { return CASTBY[id] ? CASTBY[id].name : id === 'pool' ? 'Option pool' : holders && holders[id] ? holders[id].name : id; }
+  function colorOf(id) { return COLOR[id] || (id === 'pool' ? 'var(--hatch-a)' : 'var(--inv0)'); }
+  function inTeam(id) { return !!(G.team[id] && G.team[id].in); }
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ICON = {
+    lock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+    unlock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/></svg>',
+    play: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg>',
+    pause: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
+  };
+  var toastT = null;
+  function toast(t, undoable) {
+    var el = $('#toast');
+    el.innerHTML = '<span>' + esc(t) + '</span>' + (undoable ? '<button type="button" id="toastUndo">Undo</button>' : '');
+    el.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3800);
+    if (undoable) $('#toastUndo').onclick = function () { undo(); el.hidden = true; };
+  }
+
+  // ---------- history ----------
+  var lastAt = null, lastFull = null, baseline = null, baseT = null;
+  function snap() { var c = JSON.parse(JSON.stringify(G)); delete c.month; return JSON.stringify(c); }
+  function startInteraction(keep) {
+    if ((keep && baseline) || !lastAt) return;
+    baseline = {}; lastAt.rows.forEach(function (r) { baseline[r.id] = r.econ; });
+  }
+  function pushHist() { startInteraction(); hist.push(snap()); if (hist.length > 200) hist.shift(); fut = []; updUndo(); }
+  function burstHist() { if (!burst) pushHist(); else startInteraction(true); clearTimeout(burst); burst = setTimeout(function () { burst = null; }, 700); }
+  function restore(j) { var m = G.month; G = B.normalize(JSON.parse(j)); G.month = m; renderAll(); }
+  function undo() { if (!hist.length) return; startInteraction(); fut.push(snap()); restore(hist.pop()); updUndo(); }
+  function redo() { if (!fut.length) return; startInteraction(); hist.push(snap()); restore(fut.pop()); updUndo(); }
+  function updUndo() { $('#undoBtn').disabled = !hist.length; $('#redoBtn').disabled = !fut.length; }
+
+  // ---------- controls ----------
+  var FACT = { 'cash.amount': 1 };
+  function tag(path) {
+    if (FACT[path]) return '<span class="tag fact" title="Known fact">fact</span>';
+    return G.touched[path] ? '' : '<span class="tag" data-tag="' + path + '" title="Prefilled example value, not a known fact">example</span>';
+  }
+  function cid(path) { return 'c-' + path.replace(/\./g, '-'); }
+  var FMT = {
+    pct: function (v) { return n(v).toFixed(1) + '%'; },
+    pct0: function (v) { return Math.round(n(v)) + '%'; },
+    mo: function (v) { return 'month ' + Math.round(n(v)); },
+    mos: function (v) { return months(v); },
+    yrs: function (v) { return n(v) === 0 ? 'none' : n(v) + (n(v) === 1 ? ' year' : ' years'); },
+    eur: function (v) { return eurS(v); },
+    mult: function (v) { return '×' + n(v); }
+  };
+  // S(path, label, min, max, step, format, opts{color, log:[lo,hi], hint})
+  function S(path, label, min, max, step, fmtName, o) {
+    o = o || {};
+    var v = n(getP(G, path)), id = cid(path), sv = v, smin = min, smax = max, sstep = step;
+    if (o.log) { smin = 0; smax = 1000; sstep = 1; sv = Math.round(Math.log(Math.max(v, o.log[0]) / o.log[0]) / Math.log(o.log[1] / o.log[0]) * 1000); }
+    var f = Math.max(0, Math.min(100, (sv - smin) / (smax - smin) * 100));
+    return '<div class="ctl"><div class="ctl-h"><label for="' + id + '">' + esc(label) + '</label>' + tag(path) + '<output id="o-' + id + '">' + esc(FMT[fmtName](v)) + '</output></div>' +
+      '<input type="range" class="sl" id="' + id + '" data-g="' + path + '" min="' + smin + '" max="' + smax + '" step="' + sstep + '" value="' + sv + '"' +
+      (o.log ? ' data-log="' + o.log[0] + ',' + o.log[1] + '"' : '') + ' data-fmt="' + fmtName + '" style="--fill:' + f + '%;' + (o.color ? '--c:' + o.color : '') + '">' +
+      (o.hint ? '<p class="hint">' + o.hint + '</p>' : '') + '</div>';
+  }
+  function seg(path, label, opts, o) {
+    o = o || {};
+    var v = getP(G, path);
+    return '<div>' + (label ? '<div class="seglab">' + esc(label) + '</div>' : '') + '<div class="seg" role="group" aria-label="' + esc(label || path) + '">' +
+      opts.map(function (op) { return '<button type="button" data-g="' + path + '" data-v="' + esc(op[0]) + '" aria-pressed="' + (String(v) === String(op[0])) + '"' + (op[2] ? ' title="' + esc(op[2]) + '"' : '') + '>' + esc(op[1]) + '</button>'; }).join('') + '</div>' + (o.hint ? '<p class="hint" style="margin-top:4px">' + o.hint + '</p>' : '') + '</div>';
+  }
+  function sw(path, label) {
+    return '<button type="button" class="sw" role="switch" data-sw="' + path + '" id="' + cid(path) + '" aria-checked="' + (!!getP(G, path)) + '" aria-label="' + esc(label) + '"></button>';
+  }
+  function teamOpts() { return B.IDS.filter(function (id) { return inTeam(id); }).map(function (id) { return [id, CASTBY[id].name]; }); }
+  function niceRound(v) { if (v <= 0) return 0; var p = Math.pow(10, Math.floor(Math.log10(v)) - 1); return Math.round(v / p) * p; }
+
+  // ---------- step 1: team ----------
+  function renderTeam() {
+    $('#cast').innerHTML = B.CAST.map(function (c) {
+      var t = G.team[c.id], fixed = c.id === 'pranav';
+      var roles = fixed ? [['ft', 'Full-time'], ['pt', 'Part-time']] : [['ft', 'Full-time co-founder'], ['pt', 'Part-time co-founder'], ['hire', 'First hire'], ['adv', 'Advisor']];
+      return '<div class="card' + (t.in ? ' in' : '') + (fixed ? ' fixed' : '') + '" style="--pc:' + COLOR[c.id] + '" data-card="' + c.id + '">' +
+        '<div class="card-top"><span class="av lg" style="background:' + COLOR[c.id] + '">' + c.name[0] + '</span><div><h3>' + esc(c.full) + '</h3><small>' + (fixed ? 'Founder · owns 100% today' : t.in ? B.ROLES[t.role] : 'Not in the team') + '</small></div></div>' +
+        '<p class="blurb">' + esc(c.blurb) + '</p>' +
+        (fixed ? '<button type="button" class="joinbtn" disabled>Always in</button>' : '<button type="button" class="joinbtn" id="join-' + c.id + '" data-join="' + c.id + '" aria-pressed="' + t.in + '">' + (t.in ? '✓ In the team' : '+ Bring ' + esc(c.name) + ' in') + '</button>') +
+        seg('team.' + c.id + '.role', fixed ? 'Pranav’s commitment' : t.in ? 'Role' : 'Role if they join', roles) +
+        '<div class="imp" id="timp-' + c.id + '"></div></div>';
+    }).join('');
+  }
+
+  // ---------- step 2: split ----------
+  function renderSplit() {
+    var fs = B.founders(G), gs = B.grantees(G), h = '';
+    if (fs.length < 2) h += '<div class="empty">Pranav holds all founder shares. Bring a co-founder in at step 1 and their slider appears here.</div>';
+    else {
+      h += '<div class="splithead"><div class="splitbar" id="splitbar" style="flex:1 1 200px">' + fs.map(function (id) { return '<i style="width:' + n(G.split[id]) + '%;background:' + COLOR[id] + '" data-sb="' + id + '"></i>'; }).join('') + '</div>' +
+        '<button type="button" class="btn small" data-op="equal">Split equally</button></div>';
+      fs.forEach(function (id) {
+        var c = CASTBY[id], lk = !!G.lock[id];
+        h += '<div class="srow"><div class="srow-main"><span class="av" style="background:' + COLOR[id] + '">' + c.name[0] + '</span>' +
+          '<div class="sl-cell">' + S('split.' + id, c.name + ' · share of founder shares', 0, 100, 0.5, 'pct', { color: COLOR[id] }) + '</div>' +
+          '<div class="owns" id="own-' + id + '"><b>–</b><span></span></div>' +
+          '<button type="button" class="lockbtn" id="lock-' + id + '" data-lock="' + id + '" aria-pressed="' + lk + '" title="' + (lk ? 'Unlock' : 'Lock: hold this share still') + '" aria-label="' + (lk ? 'Unlock ' : 'Lock ') + esc(c.name) + '">' + (lk ? ICON.lock : ICON.unlock) + '</button></div>' +
+          '<details class="more" data-open="ms-' + id + '"' + (store.ui.open['ms-' + id] ? ' open' : '') + '><summary>Tie part of ' + esc(c.name) + '’s shares to a milestone</summary><div class="morebody">' +
+          S('ms.' + id + '.stake', 'Part tied to the milestone', 0, 100, 5, 'pct0', { color: COLOR[id], hint: '0% = no milestone.' }) +
+          S('ms.' + id + '.deadline', 'Deadline', 0, 60, 1, 'mo', { color: COLOR[id] }) +
+          seg('ms.' + id + '.status', 'Outcome', [['open', 'Open'], ['met', 'Met']].concat(G.vest.rule === 'extend' ? [['late', 'Met late']] : []).concat([['missed', 'Missed']])) +
+          '</div></details></div>';
+      });
+    }
+    if (gs.length) {
+      h += '<div class="eyebrow" style="margin-top:8px">Virtual shares (VSOP): paid in a sale, no votes. They come out of the option pool.</div>';
+      gs.forEach(function (id) {
+        var c = CASTBY[id], role = G.team[id].role;
+        h += '<div class="srow"><div class="srow-main"><span class="av" style="background:' + COLOR[id] + '">' + c.name[0] + '</span>' +
+          '<div class="sl-cell">' + S('grant.' + id + '.pct', c.name + ' · ' + B.ROLES[role].toLowerCase() + ' · virtual shares', 0, role === 'adv' ? 5 : 15, 0.1, 'pct', { color: COLOR[id] }) + '</div>' +
+          '<div class="owns" id="own-' + id + '"><b>–</b><span></span></div><span></span></div>' +
+          '<details class="more" data-open="gr-' + id + '"' + (store.ui.open['gr-' + id] ? ' open' : '') + '><summary>Start date and vesting</summary><div class="morebody">' +
+          S('grant.' + id + '.start', 'Starts', 0, 36, 1, 'mo', { color: COLOR[id] }) +
+          S('grant.' + id + '.years', 'Vests over', 0, 6, 0.5, 'yrs', { color: COLOR[id] }) +
+          S('grant.' + id + '.cliff', 'Cliff', 0, 24, 1, 'mos', { color: COLOR[id] }) +
+          '</div></details></div>';
+      });
+    }
+    $('#split').innerHTML = h;
+  }
+
+  // ---------- step 3: levers ----------
+  var LEVERS = [
+    { key: 'credit', title: 'Credit for Pranav’s prototype', sub: 'Extra shares for work done before founding.', sw: 'credit.on', body: function () {
+      return S('credit.pct', 'Size of the credit', 0, 30, 0.5, 'pct', { color: COLOR.pranav, hint: 'Issued on top, so everyone else is diluted. Kept outside the founder split.' });
+    } },
+    { key: 'cash', title: 'Pranav’s €2,000', sub: 'Money already put in. How is it treated?', body: function () {
+      var h = seg('cash.mode', 'Treated as', [['none', 'Not decided'], ['loan', 'Loan'], ['shares', 'Shares'], ['expense', 'Expense']],
+        { hint: { none: 'Today’s state: invested, not yet booked.', loan: 'Repaid to Pranav before any shareholder in a sale. No change in ownership.', shares: 'Buys extra shares at a valuation.', expense: 'The company pays it back as an expense. No change in ownership.' }[G.cash.mode] });
+      h += '<div><div class="seglab">Amount ' + tag('cash.amount') + '</div><div class="amt"><span>€</span><input type="number" id="c-cash-amount" data-num="cash.amount" value="' + n(G.cash.amount) + '" min="0" step="50" aria-label="Amount in euros"></div><p class="hint" style="margin-top:4px">A little over €2,000; enter the exact figure.</p></div>';
+      if (G.cash.mode === 'shares') h += S('cash.valuation', 'Company valuation for these shares', 100000, 5000000, 50000, 'eur');
+      return h;
+    } },
+    { key: 'vest', title: 'Vesting for founders', sub: 'Founder shares are earned over time. Leavers return what is unearned.', sw: 'vest.on', body: function () {
+      return S('vest.years', 'Vests over', 0, 6, 0.5, 'yrs') + S('vest.cliff', 'Cliff (nothing earned before)', 0, 24, 1, 'mos') +
+        S('vest.backdate', 'Pranav’s vesting starts earlier by', 0, 24, 1, 'mos', { hint: 'Counts Pranav’s pre-founding work as time already served.' }) +
+        seg('vest.rule', 'If a milestone is missed, its part', [['pool', 'Goes to pool'], ['founders', 'Goes to others'], ['extend', 'Gets one extension']]) +
+        (G.vest.rule === 'extend' ? S('vest.ext', 'Extension', 0, 12, 1, 'mos', { hint: 'Still missed after it: the part goes to the pool.' }) : '');
+    } },
+    { key: 'pool', title: 'Option pool', sub: 'Virtual shares set aside for hires and advisors.', sw: 'pool.on', body: function () {
+      return S('pool.pct', 'Unallocated pool', 0, 25, 0.5, 'pct', { hint: 'Dilutes economic ownership, not votes. Grants at step 2 come out of it.' });
+    } },
+    { key: 'round', title: 'Funding round', sub: 'Investors buy new shares with votes.', sw: 'round.on', body: function () {
+      return S('round.amount', 'Amount raised', 100000, 5000000, 50000, 'eur') + S('round.pre', 'Pre-money valuation', 1000000, 30000000, 250000, 'eur') +
+        S('round.topup', 'Pool top-up before the round', 0, 20, 0.5, 'pct', { hint: 'Share of post-money; paid for by existing holders. 0 = none.' }) + S('round.month', 'When', 0, 60, 1, 'mo');
+    } },
+    { key: 'leave', title: 'Someone leaves', sub: 'What happens to their shares?', sw: 'leave.on', body: function () {
+      return seg('leave.who', 'Who', teamOpts(), { hint: inTeam(G.leave.who) ? '' : 'Pick who leaves.' }) + S('leave.month', 'Leaves at', 0, 60, 1, 'mo') +
+        seg('leave.kind', 'Leaver type', [['good', 'Good leaver', 'Keeps everything vested'], ['bad', 'Bad leaver', 'Loses vested shares too']],
+          { hint: G.leave.kind === 'bad' ? 'Loses all shares, vested or not. The buy-back price is not modelled.' : 'Keeps vested shares; unvested ones return. Without vesting, everything counts as vested.' }) +
+        seg('leave.to', 'Returned shares', [['pool', 'To the pool'], ['founders', 'To the others'], ['cancel', 'Cancelled']]);
+    } },
+    { key: 'sale', title: 'Sale of the company', sub: 'Who gets how many euros?', sw: 'sale.on', body: function () {
+      return S('sale.price', 'Sale price', 0, 0, 0, 'eur', { log: [500000, 200000000] }) +
+        seg('sale.pref', 'Investor preference', [['none', 'None'], ['1x', '1×'], ['1xp', '1× participating'], ['2x', '2×']],
+          { hint: 'Order: Pranav’s loan first, then investor preferences, then everyone by shares. 1× and 2× are non-participating.' }) +
+        S('sale.month', 'Sold at', 0, 60, 1, 'mo') +
+        seg('sale.unvested', 'Unvested shares at the sale', [['accelerate', 'Count in full'], ['forfeit', 'Forfeited']]);
+    } },
+    { key: 'vote', title: 'Voting rules', sub: 'Who controls decisions, separate from who owns what.', body: function () {
+      var h = seg('vote.mode', 'Votes', [['shares', 'Shares = votes'], ['head', 'One person, one vote'], ['extra', 'Extra votes']]);
+      if (G.vote.mode === 'extra') {
+        h += seg('vote.who', 'Who gets extra votes', teamOpts(), { hint: inTeam(G.vote.who) ? '' : 'Pick who gets the extra votes.' }) + S('vote.mult', 'Votes per share', 1, 5, 0.5, 'mult');
+      }
+      h += '<div><div class="seglab">Reserved matters (need special approval)</div><div style="display:grid;gap:6px">';
+      (G.vote.reserved || []).forEach(function (r, i) {
+        h += '<div class="resrow"><div style="display:flex;gap:6px"><input type="text" id="c-res-' + i + '" data-text="vote.reserved.' + i + '.name" value="' + esc(r.name) + '" aria-label="Decision"><button type="button" class="btn small" data-op="rm-res" data-i="' + i + '" aria-label="Remove">✕</button></div>' +
+          seg('vote.reserved.' + i + '.rule', '', [['unanimous', 'Everyone agrees'], ['consent', 'Needs consent of'], ['pct', 'Needs 75% of votes']]) +
+          (r.rule === 'consent' ? seg('vote.reserved.' + i + '.person', '', teamOpts()) : '') +
+          '<div class="imp" id="resimp-' + i + '"></div></div>';
+      });
+      h += '<div><button type="button" class="btn small" data-op="add-res">+ Add a reserved matter</button></div></div></div>';
+      return h;
+    } }
+  ];
+  function leverOn(L) {
+    if (L.key === 'cash') return G.cash.mode !== 'none';
+    if (L.key === 'vote') return G.vote.mode !== 'shares' || (G.vote.reserved || []).length > 0;
+    return !!getP(G, L.sw);
+  }
+  function renderLevers() {
+    $('#levers').innerHTML = LEVERS.map(function (L) {
+      return '<div class="lever' + (leverOn(L) ? ' on' : '') + '" data-lever="' + L.key + '"><div class="lever-h"><div><h3>' + esc(L.title) + '</h3><p>' + esc(L.sub) + '</p></div>' + (L.sw ? sw(L.sw, L.title) : '') + '</div>' +
+        '<div class="ctls">' + L.body() + '</div><div class="imp" id="limp-' + L.key + '"></div></div>';
+    }).join('');
+  }
+
+  // ---------- scoreboard ----------
+  var shown = {};
+  function tweenNum(el, key, to, fmt) {
+    var from = shown[key];
+    shown[key] = to;
+    if (reduced || from === undefined || Math.abs(from - to) < 0.001) { el.textContent = fmt(to); return; }
+    var t0 = performance.now(), tok = {};
+    el._t = tok;
+    el.textContent = fmt(from);
+    (function f(now) { if (el._t !== tok) return; var k = Math.min(1, (now - t0) / 380), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (to - from) * e); if (k < 1) requestAnimationFrame(f); })(t0);
+  }
+  var dCur = { outer: {}, inner: {} }, dRaf = null, hoverId = null;
+  function arc(r0, r1, a0, a1) {
+    if (a1 - a0 >= Math.PI * 2 - 1e-6) a1 = a0 + Math.PI * 2 - 1e-4;
+    var la = a1 - a0 > Math.PI ? 1 : 0;
+    var p = function (r, a) { return (r * Math.sin(a)).toFixed(2) + ' ' + (-r * Math.cos(a)).toFixed(2); };
+    return 'M' + p(r1, a0) + ' A' + r1 + ' ' + r1 + ' 0 ' + la + ' 1 ' + p(r1, a1) + ' L' + p(r0, a1) + ' A' + r0 + ' ' + r0 + ' 0 ' + la + ' 0 ' + p(r0, a0) + 'Z';
+  }
+  function fillOf(id) { return id === 'pool' ? 'url(#hatch)' : id === 'unv' ? 'url(#unv)' : colorOf(id); }
+  function drawDonut(outer, inner) {
+    var from = { outer: Object.assign({}, dCur.outer), inner: Object.assign({}, dCur.inner) };
+    var to = { outer: {}, inner: {} }, order = { outer: outer.map(function (x) { return x.id; }), inner: inner.map(function (x) { return x.id; }) };
+    outer.forEach(function (x) { to.outer[x.id] = x.v; });
+    inner.forEach(function (x) { to.inner[x.id] = x.v; });
+    ['outer', 'inner'].forEach(function (ring) { Object.keys(from[ring]).forEach(function (id) { if (!(id in to[ring])) { to[ring][id] = 0; order[ring].push(id); } }); });
+    var t0 = performance.now();
+    cancelAnimationFrame(dRaf);
+    function frame(now) {
+      var k = reduced ? 1 : Math.min(1, (now - t0) / 420), e = 1 - Math.pow(1 - k, 3);
+      var svg = '<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" style="fill:var(--hatch-b)"/><rect width="4" height="8" style="fill:var(--hatch-a)"/></pattern>' +
+        '<pattern id="unv" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--unv-b)"/><rect width="3" height="6" style="fill:var(--unv-a)"/></pattern></defs>';
+      ['outer', 'inner'].forEach(function (ring) {
+        var r0 = ring === 'outer' ? 112 : 84, r1 = ring === 'outer' ? 152 : 104, a = 0;
+        svg += '<circle r="' + ((r0 + r1) / 2) + '" style="fill:none;stroke:var(--track);stroke-width:' + (r1 - r0) + '"/>';
+        order[ring].forEach(function (id) {
+          var v = (from[ring][id] || 0) + ((to[ring][id] || 0) - (from[ring][id] || 0)) * e;
+          dCur[ring][id] = v;
+          if (v <= 0.01) return;
+          var a1 = a + v / 100 * Math.PI * 2;
+          svg += '<path d="' + arc(r0, r1, a + 0.005, a1 - 0.005) + '" style="fill:' + fillOf(id) + '" data-seg="' + id + '"' + (hoverId && hoverId !== id ? ' class="dim"' : '') + '></path>';
+          a = a1;
+        });
+      });
+      $('#donut').innerHTML = svg;
+      if (k < 1) dRaf = requestAnimationFrame(frame);
+      else ['outer', 'inner'].forEach(function (ring) { Object.keys(dCur[ring]).forEach(function (id) { if (!(to[ring][id] > 0.01)) delete dCur[ring][id]; }); });
+    }
+    dRaf = requestAnimationFrame(frame);
+  }
+  function setCenter() {
+    var c = $('#dcenter');
+    if (!lastAt) return;
+    var r = hoverId && lastAt.rows.find(function (x) { return x.id === hoverId && x.units > 1e-7; });
+    if (r) {
+      c.innerHTML = '<span class="nm">' + esc(nameOf(r.id, lastAt.holders)) + '</span><b>' + pct(r.econ) + '</b><span>' + (r.kind === 'pool' ? 'not granted yet' : 'votes ' + pct(r.vote) + '<br>earned ' + pct(r.earned)) + '</span>';
+    } else {
+      var owners = lastAt.rows.filter(function (x) { return x.units > 1e-7 && x.kind !== 'pool'; }).length;
+      c.innerHTML = '<span class="nm">Month ' + G.month + '</span><b>' + owners + '</b><span>' + (owners === 1 ? 'owner' : 'owners') + '</span>';
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#donut path[data-seg]'), function (p) { p.classList.toggle('dim', !!hoverId && p.dataset.seg !== hoverId); });
+    Array.prototype.forEach.call(document.querySelectorAll('.prow'), function (p) { p.classList.toggle('hl', p.dataset.id === hoverId); });
+  }
+  var BADGE = { decides: 'Decides', tie: 'Tie 50%', articles: 'Changes articles', blocks: 'Blocks articles' };
+  var PREF_L = { none: 'no preference', '1x': '1× non-participating', '1xp': '1× participating', '2x': '2× non-participating' };
+  function renderBoard(full, at) {
+    var rows = at.rows.filter(function (r) { return r.units > 1e-7; });
+    var sale = full.exits.length ? full.exits[full.exits.length - 1].res : null;
+    var outer = rows.map(function (r) { return { id: r.id, v: r.econ }; });
+    var inner = [], unv = 0;
+    rows.forEach(function (r) { if (r.kind === 'pool') return; inner.push({ id: r.id, v: r.earned }); unv += r.econ - r.earned; });
+    var pool = rows.find(function (r) { return r.kind === 'pool'; });
+    if (pool) inner.push({ id: 'pool', v: pool.econ });
+    if (unv > 0.01) inner.push({ id: 'unv', v: unv });
+    drawDonut(outer, inner);
+    var h = '';
+    rows.forEach(function (r) {
+      var nm = nameOf(r.id, at.holders);
+      var role = CASTBY[r.id] ? (r.id === 'pranav' ? 'Founder' : B.ROLES[G.team[r.id].role]) : r.kind === 'investor' ? 'Investor' : 'Not granted yet · no votes';
+      var d = baseline ? r.econ - (baseline[r.id] || 0) : 0;
+      var ctl = r.kind === 'pool' ? [] : E.control(r.vote);
+      var pay = sale && sale.rows[r.id] ? sale.rows[r.id].total : null;
+      var ep = r.econ > 1e-9 ? Math.min(100, r.earned / r.econ * 100) : 0;
+      h += '<div class="prow" data-id="' + r.id + '">' +
+        (r.kind === 'pool' ? '<span class="av pool"></span>' : '<span class="av" style="background:' + colorOf(r.id) + '">' + esc(nm[0]) + '</span>') +
+        '<div class="meta"><div class="nm">' + esc(nm) + (Math.abs(d) >= 0.05 ? '<span class="delta ' + (d > 0 ? 'up' : 'down') + '">' + dpct(d) + '</span>' : '') + '</div><div class="rl">' + esc(role) + '</div></div>' +
+        '<div class="big" data-k="e-' + r.id + '"></div>' +
+        (r.kind === 'pool' ? '' : '<div class="xp" title="Earned ' + pct(r.earned) + ' of ' + pct(r.econ) + ' by month ' + G.month + '"><i style="width:' + ep + '%;background:' + colorOf(r.id) + '"></i></div>') +
+        '<div class="sub">' + (r.kind === 'pool' ? '' : '<span>votes <span class="v' + (Math.abs(r.vote - r.econ) >= 0.05 ? ' diff' : '') + '">' + pct(r.vote) + '</span></span><span>earned <span class="v">' + pct(r.earned) + '</span></span>') +
+        (pay !== null ? '<span>sale <span class="pay">' + eurS(pay) + '</span></span>' : '') +
+        ctl.map(function (k) { return '<span class="badge b-' + k + '">' + BADGE[k] + '</span>'; }).join('') + '</div></div>';
+    });
+    var none = B.IDS.filter(function (id) { return !rows.some(function (r) { return r.id === id; }) && inTeam(id); });
+    if (none.length) h += '<div class="hint" style="padding:4px 6px">' + esc(none.map(function (id) { return CASTBY[id].name; }).join(', ')) + ': nothing yet at month ' + G.month + '.</div>';
+    $('#rows').innerHTML = h;
+    rows.forEach(function (r) { var el = document.querySelector('[data-k="e-' + r.id + '"]'); if (el) tweenNum(el, 'e-' + r.id, r.econ, pct); });
+    var sb;
+    if (sale) {
+      sb = 'Sale at <b class="pay">' + eur(sale.price) + '</b> in month ' + sale.month + ' · ' + PREF_L[sale.pref] + '.';
+      if (sale.loans > 0) sb += ' Pranav’s loan of ' + eur(sale.loans) + ' is paid first.';
+      if (full.rows.some(function (r) { return r.kind === 'pool' && r.econ > 0.05; })) sb += ' The unallocated pool is not paid out; its value goes to the holders.';
+    } else sb = 'No sale yet. Flip “Sale of the company” to see euros per person.';
+    if (full.reimb.length) sb += ' Paid back to Pranav as an expense: ' + eur(full.reimb[0].amount) + '.';
+    $('#salebox').innerHTML = sb;
+    $('#mbarBar').innerHTML = rows.map(function (r) { return '<i style="width:' + r.econ + '%;background:' + (r.kind === 'pool' ? 'repeating-linear-gradient(135deg,var(--hatch-a) 0 4px,var(--hatch-b) 4px 8px)' : colorOf(r.id)) + '"></i>'; }).join('');
+    $('#mbarLeg').innerHTML = rows.map(function (r) { var d = baseline ? r.econ - (baseline[r.id] || 0) : 0; return '<span><i class="dot" style="background:' + colorOf(r.id) + '"></i>' + esc(r.kind === 'pool' ? 'Pool' : nameOf(r.id, at.holders)) + ' ' + pct(r.econ) + (Math.abs(d) >= 0.05 ? ' (' + dpct(d) + ')' : '') + '</span>'; }).join('');
+    setCenter();
+  }
+  function renderAlerts(full) {
+    var h = '', seen = {};
+    full.warnings.forEach(function (w) { if (seen[w.text]) return; seen[w.text] = 1; h += '<div class="msg bad"><span class="ic">!</span><span>' + esc(w.text.replace(/Add an option pool action above this grant\./, 'Switch on the option pool lever.')) + '</span></div>'; });
+    var x = full.exist;
+    if (!full.warnings.length) h += '<div class="msg ok"><span class="ic">✓</span><span>Totals are 100%. No impossible states.</span></div>';
+    h += '<div class="msg ' + (x.over ? 'bad' : 'neutral') + '"><span class="ic">' + (x.over ? '!' : 'i') + '</span><span><b>EXIST:</b> ' + x.count + ' full-time founder' + (x.count === 1 ? '' : 's') + (x.count ? ' (' + esc(x.names.join(', ')) + ')' : '') + '. ' + (x.over ? 'The grant funds at most three.' : 'The grant funds at most three.') + '</span></div>';
+    if (x.later.length) h += '<div class="msg warn"><span class="ic">!</span><span><b>EXIST wants the split stated up front.</b> Here it changes after founding: ' + esc(x.later.map(function (s) { return s.replace(/^Action \d+: /, '').replace(/^Action \d+ uses Slicing Pie.*$/, 'Slicing Pie.'); }).join(' ')) + '</span></div>';
+    $('#alerts').innerHTML = h;
+  }
+  function diffLine(a, b, kind) {
+    var k = kind || 'econ', out = [], ids = {};
+    a.rows.concat(b.rows).forEach(function (r) { ids[r.id] = 1; });
+    Object.keys(ids).forEach(function (id) {
+      var ra = a.rows.find(function (r) { return r.id === id; }), rb = b.rows.find(function (r) { return r.id === id; });
+      var dd = (rb ? rb[k] : 0) - (ra ? ra[k] : 0);
+      if (Math.abs(dd) >= 0.05) out.push({ id: id, d: dd, name: nameOf(id, Object.assign({}, a.holders, b.holders)) });
+    });
+    out.sort(function (x, y) { return Math.abs(y.d) - Math.abs(x.d); });
+    return out.map(function (o) { return '<span class="d ' + (o.d > 0 ? 'up' : 'down') + '">' + esc(o.id === 'pool' ? 'Pool' : o.name) + ' ' + dpct(o.d) + '</span>'; }).join('');
+  }
+  function renderImpacts(full) {
+    B.CAST.forEach(function (c) {
+      var el = document.getElementById('timp-' + c.id);
+      if (!el) return;
+      if (c.id === 'pranav') { var pr = full.rows.find(function (r) { return r.id === 'pranav'; }); el.innerHTML = '<span>Owns</span><span class="d">' + pct(pr ? pr.econ : 0) + '</span><span>in this setup</span>'; return; }
+      if (inTeam(c.id)) {
+        var w = E.run(B.build(G, { without: c.id }));
+        var l = diffLine(w, full);
+        el.innerHTML = l ? '<span>Having them in moves:</span>' + l : '<span>Having them in changes nothing yet.</span>';
+      } else {
+        var G2 = JSON.parse(JSON.stringify(G));
+        G2.team[c.id].in = true;
+        if (B.isFounderRole(G2.team[c.id].role)) B.equalize(G2);
+        var l2 = diffLine(full, E.run(B.build(G2)));
+        el.innerHTML = l2 ? '<span>If they join' + (B.isFounderRole(G2.team[c.id].role) ? ' (equal split)' : '') + ':</span>' + l2 : '<span>Joining would change nothing' + (B.isFounderRole(G2.team[c.id].role) ? '' : ' until the option pool is on') + '.</span>';
+      }
+    });
+    LEVERS.forEach(function (L) {
+      var el = document.getElementById('limp-' + L.key);
+      if (!el) return;
+      if (!leverOn(L)) { el.innerHTML = '<span>' + (L.key === 'cash' ? 'Not decided yet. Pick how it is treated to see the effect.' : L.key === 'vote' ? 'Default: shares = votes.' : 'Off. Flip it or move a control to see what it does.') + '</span>'; return; }
+      if (L.key === 'sale') {
+        var s = full.exits.length ? full.exits[full.exits.length - 1].res : null;
+        el.innerHTML = s ? '<b>Payout:</b>' + Object.keys(s.rows).sort(function (a, b) { return s.rows[b].total - s.rows[a].total; }).map(function (id) { return '<span class="d">' + esc(nameOf(id, full.holders)) + ' ' + eurS(s.rows[id].total) + '</span>'; }).join('') : '';
+        return;
+      }
+      var off = {}; off[L.key] = 1;
+      var w = E.run(B.build(G, { off: off }));
+      var econ = diffLine(w, full), votes = diffLine(w, full, 'vote');
+      if (L.key === 'vest') {
+        var wm = E.run(B.build(G, { off: off }), { month: G.month }), earned = diffLine(wm, lastAt, 'earned');
+        el.innerHTML = (econ ? '<b>Effect:</b>' + econ : '<span>No change on paper.</span>') + (earned ? '<b>Earned by month ' + G.month + ':</b>' + earned : '<span>Earned by month ' + G.month + ': no difference.</span>');
+        return;
+      }
+      if (L.key === 'vote') { el.innerHTML = votes ? '<b>Votes:</b>' + votes : '<span>Votes unchanged.</span>'; renderReserved(full); return; }
+      el.innerHTML = econ ? '<b>Effect:</b>' + econ + (votes && votes !== econ ? '<b>Votes:</b>' + votes : '') : '<span>No change in ownership' + (L.key === 'cash' && G.cash.mode === 'loan' ? '. Repaid first in a sale.' : '.') + '</span>';
+    });
+    B.IDS.forEach(function (id) {
+      var el = document.getElementById('own-' + id);
+      if (!el) return;
+      var r = lastAt.rows.find(function (x) { return x.id === id; });
+      tweenNum(el.querySelector('b'), 'own-' + id, r ? r.econ : 0, pct);
+      el.querySelector('span').textContent = 'owns at month ' + G.month;
+    });
+  }
+  function renderReserved(full) {
+    (G.vote.reserved || []).forEach(function (q, i) {
+      var el = document.getElementById('resimp-' + i);
+      if (!el) return;
+      var b = E.reservedBlockers(full.rows.filter(function (r) { return r.kind !== 'pool' && r.units > 1e-7; }), q);
+      el.innerHTML = '<span>Can stop it alone:</span>' + (b.length ? b.map(function (id) { return '<span class="d">' + esc(nameOf(id, full.holders)) + '</span>'; }).join('') : '<span class="d">nobody</span>');
+    });
+  }
+
+  // ---------- recompute ----------
+  function recompute() {
+    var st = B.build(G);
+    var full = E.run(st), at = E.run(st, { month: G.month });
+    lastFull = full; lastAt = at;
+    renderBoard(full, at);
+    renderAlerts(full);
+    renderImpacts(full);
+    updClock();
+    renderSaves();
+    persist();
+    if (baseline) { clearTimeout(baseT); baseT = setTimeout(function () { baseline = null; if (lastAt) renderBoard(lastFull, lastAt); }, 2600); }
+  }
+  var rq = null;
+  function schedule() { if (!rq) rq = requestAnimationFrame(function () { rq = null; recompute(); }); }
+  function renderControls() {
+    var f = document.activeElement && document.activeElement.id;
+    renderTeam(); renderSplit(); renderLevers();
+    if (f) { var el = document.getElementById(f); if (el) el.focus({ preventScroll: true }); }
+  }
+  function renderAll() { renderControls(); recompute(); updUndo(); }
+
+  // ---------- clock ----------
+  var playT = null;
+  function updClock() {
+    var m = G.month;
+    $('#monthRange').value = m;
+    $('#monthRange').style.setProperty('--fill', (m / 60 * 100) + '%');
+    $('#clockMonth').textContent = 'Month ' + m;
+    $('#clockSub').textContent = m === 0 ? 'Founding day' : m < 12 ? months(m) + ' after founding' : (m / 12).toFixed(m % 12 ? 1 : 0) + ' years after founding';
+  }
+  function setMonth(m) { G.month = Math.max(0, Math.min(60, Math.round(m))); updClock(); schedule(); }
+  function stopPlay() { clearInterval(playT); playT = null; $('#playBtn').innerHTML = ICON.play; $('#playBtn').setAttribute('aria-label', 'Play the clock'); }
+  $('#playBtn').addEventListener('click', function () {
+    if (playT) { stopPlay(); return; }
+    if (G.month >= 60) G.month = 0;
+    $('#playBtn').innerHTML = ICON.pause; $('#playBtn').setAttribute('aria-label', 'Pause');
+    setMonth(G.month);
+    playT = setInterval(function () { if (G.month >= 60) { stopPlay(); return; } setMonth(G.month + 1); }, 110);
+  });
+  $('#monthRange').addEventListener('input', function () { stopPlay(); setMonth(+this.value); });
+
+  // ---------- events ----------
+  var LEVER_SW = { credit: 'credit.on', vest: 'vest.on', pool: 'pool.on', round: 'round.on', leave: 'leave.on', sale: 'sale.on' };
+  function autoOn(path) {
+    var s = LEVER_SW[path.split('.')[0]];
+    if (s && !getP(G, s)) {
+      setP(G, s, true);
+      var b = document.querySelector('[data-sw="' + s + '"]');
+      if (b) { b.setAttribute('aria-checked', 'true'); b.closest('.lever').classList.add('on'); }
+    }
+  }
+  function sliderValue(el) {
+    var v = +el.value;
+    if (el.dataset.log) { var lh = el.dataset.log.split(',').map(Number); v = niceRound(lh[0] * Math.pow(lh[1] / lh[0], v / 1000)); }
+    return v;
+  }
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (el.id === 'monthRange') return;
+    if (el.classList.contains('sl') && el.dataset.g) {
+      burstHist();
+      var path = el.dataset.g, v = sliderValue(el);
+      el.style.setProperty('--fill', ((+el.value - +el.min) / (+el.max - +el.min) * 100) + '%');
+      G.touched[path] = 1;
+      var tg = el.closest('.ctl').querySelector('[data-tag]'); if (tg) tg.remove();
+      if (path.indexOf('split.') === 0) {
+        B.setSplit(G, path.split('.')[1], v);
+        B.founders(G).forEach(function (id) {
+          var s = document.getElementById('c-split-' + id), o = document.getElementById('o-c-split-' + id), bar = document.querySelector('[data-sb="' + id + '"]');
+          if (s && s !== el) { s.value = G.split[id]; s.style.setProperty('--fill', G.split[id] + '%'); }
+          if (s === el && Math.abs(G.split[id] - v) > 0.01) { s.value = G.split[id]; s.style.setProperty('--fill', G.split[id] + '%'); }
+          if (o) o.textContent = FMT.pct(G.split[id]);
+          if (bar) bar.style.width = G.split[id] + '%';
+        });
+      } else {
+        setP(G, path, v);
+        autoOn(path);
+        var out = document.getElementById('o-' + el.id);
+        if (out) out.textContent = FMT[el.dataset.fmt](v);
+      }
+      schedule();
+      return;
+    }
+    if (el.dataset.num) { burstHist(); setP(G, el.dataset.num, el.value === '' ? 0 : +el.value); schedule(); return; }
+    if (el.dataset.text) { burstHist(); setP(G, el.dataset.text, el.value); schedule(); }
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    var b = t.closest('.seg [data-g]');
+    if (b) {
+      var path = b.dataset.g, v = b.dataset.v;
+      if (String(getP(G, path)) === v) return;
+      pushHist();
+      setP(G, path, v);
+      G.touched[path] = 1;
+      autoOn(path);
+      var m = path.match(/^team\.(\w+)\.role$/);
+      if (m) roleChanged(m[1]);
+      if (path === 'vest.rule' && v !== 'extend') B.IDS.forEach(function (id) { if (G.ms[id].status === 'late') G.ms[id].status = 'missed'; });
+      renderControls(); recompute();
+      return;
+    }
+    var s = t.closest('[data-sw]');
+    if (s) { pushHist(); setP(G, s.dataset.sw, !getP(G, s.dataset.sw)); renderControls(); recompute(); return; }
+    var j = t.closest('[data-join]');
+    if (j) {
+      var id = j.dataset.join;
+      pushHist();
+      G.team[id].in = !G.team[id].in;
+      if (B.isFounderRole(G.team[id].role)) B.equalize(G);
+      renderControls(); recompute();
+      toast(CASTBY[id].name + (G.team[id].in ? ' joins as ' + B.ROLES[G.team[id].role].toLowerCase() : ' is out') + (B.isFounderRole(G.team[id].role) ? '. Founder split reset to equal.' : '.'), true);
+      return;
+    }
+    var lk = t.closest('[data-lock]');
+    if (lk) { pushHist(); var li = lk.dataset.lock; if (G.lock[li]) delete G.lock[li]; else G.lock[li] = true; renderControls(); recompute(); return; }
+    var op = t.closest('[data-op]');
+    if (op) {
+      pushHist();
+      if (op.dataset.op === 'equal') { B.equalize(G); toast('Split equally: ' + B.founders(G).map(function (x) { return CASTBY[x].name; }).join(', ') + '.'); }
+      if (op.dataset.op === 'add-res') G.vote.reserved.push({ name: 'A new co-founder joins', rule: 'consent', person: inTeam('zahra') ? 'zahra' : 'pranav', pct: 75 });
+      if (op.dataset.op === 'rm-res') G.vote.reserved.splice(+op.dataset.i, 1);
+      renderControls(); recompute();
+    }
+  });
+  document.addEventListener('toggle', function (e) {
+    var dd = e.target;
+    if (dd.dataset && dd.dataset.open) { store.ui.open[dd.dataset.open] = dd.open; persist(); }
+  }, true);
+  function roleChanged(id) {
+    var r = G.team[id].role;
+    if (!B.isFounderRole(r) && id !== 'pranav' && !G.touched['grant.' + id + '.pct']) G.grant[id] = JSON.parse(JSON.stringify(B.GRANT_DEFAULT[r]));
+    if (G.team[id].in) B.equalize(G);
+  }
+  $('#donut').addEventListener('mouseover', function (e) { var p = e.target.closest('[data-seg]'); hoverId = p && p.dataset.seg !== 'unv' ? p.dataset.seg : null; setCenter(); });
+  $('#donut').addEventListener('mouseleave', function () { hoverId = null; setCenter(); });
+  $('#rows').addEventListener('mouseover', function (e) { var p = e.target.closest('.prow'); hoverId = p ? p.dataset.id : null; setCenter(); });
+  $('#rows').addEventListener('mouseleave', function () { hoverId = null; setCenter(); });
+
+  $('#undoBtn').addEventListener('click', undo);
+  $('#redoBtn').addEventListener('click', redo);
+  $('#resetBtn').addEventListener('click', function () { pushHist(); var m = G.month; G = B.defaults(); G.month = m; renderAll(); toast('Back to today: Pranav 100%.', true); });
+  function applyTheme() {
+    var t = store.ui.theme;
+    if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    $('#themeBtn').textContent = 'Theme: ' + t;
+  }
+  $('#themeBtn').addEventListener('click', function () { var o = ['system', 'light', 'dark']; store.ui.theme = o[(o.indexOf(store.ui.theme) + 1) % 3]; applyTheme(); persist(); });
+  document.addEventListener('keydown', function (e) {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+    var tg = e.target; if (tg && ((tg.tagName === 'INPUT' && tg.type !== 'range') || tg.tagName === 'TEXTAREA')) return;
+    e.preventDefault(); if (e.shiftKey) redo(); else undo();
+  });
+
+  // ---------- saves & compare ----------
+  function renderSaves() {
+    var all = [{ id: 'working', name: 'Current board', G: G }].concat(store.saves), cmp = store.ui.cmp;
+    if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#scList')) { renderCompare(); return; }
+    $('#scList').innerHTML = all.map(function (s) {
+      var sel = cmp.indexOf(s.id) >= 0, full = cmp.length >= 4 && !sel;
+      var team = B.IDS.filter(function (id) { return s.G.team[id].in; }).map(function (id) { return CASTBY[id].name; }).join(', ');
+      return '<div class="sitem"><input type="checkbox" id="cmp-' + s.id + '" data-cmp="' + s.id + '"' + (sel ? ' checked' : '') + (full ? ' disabled' : '') + ' aria-label="Compare ' + esc(s.name) + '">' +
+        '<label for="cmp-' + s.id + '"><div class="nm">' + esc(s.name) + '</div><div class="mt">' + esc(team) + (s.at ? ' · saved ' + new Date(s.at).toLocaleDateString('en-GB') : '') + '</div></label>' +
+        (s.id === 'working' ? '<span></span>' : '<span style="display:flex;gap:4px"><button type="button" class="btn small" data-load="' + s.id + '">Load</button><button type="button" class="btn small danger" data-del="' + s.id + '">Delete</button></span>') + '</div>';
+    }).join('') + (store.saves.length ? '' : '<p class="hint">Nothing saved yet. Save the current board to compare it with another setup.</p>');
+    renderCompare();
+  }
+  function renderCompare() {
+    var price = n(store.ui.cmpPrice);
+    if (document.activeElement !== $('#cmpPrice')) $('#cmpPrice').value = price;
+    var all = [{ id: 'working', name: 'Current board', G: G }].concat(store.saves);
+    var sel = store.ui.cmp.map(function (id) { return all.find(function (s) { return s.id === id; }); }).filter(Boolean);
+    if (sel.length < 2) { $('#cmpBody').innerHTML = '<p class="hint">Tick at least two setups (the current board counts) to see them side by side.</p>'; return; }
+    var cols = sel.map(function (s) { var pa = E.payoutAt(B.build(s.G), price); return { s: s, r: pa.run, w: pa.res }; });
+    var keys = [];
+    cols.forEach(function (c) { c.r.rows.forEach(function (r) { if (r.units > 1e-7 && keys.indexOf(r.id) < 0) keys.push(r.id); }); });
+    var h = '<div class="tablewrap"><table class="cmp"><thead><tr><th class="l"></th>' + cols.map(function (c) { return '<th class="sc" colspan="3">' + esc(c.s.name) + '</th>'; }).join('') + '</tr><tr><th class="l">Who</th>' +
+      cols.map(function () { return '<th class="bl">Owns</th><th>Votes</th><th>Sale</th>'; }).join('') + '</tr></thead><tbody>';
+    keys.forEach(function (k) {
+      h += '<tr><td class="l">' + esc(nameOf(k, cols[0].r.holders)) + '</td>' + cols.map(function (c) {
+        var r = c.r.rows.find(function (x) { return x.id === k; });
+        if (!r || r.units <= 1e-7) return '<td class="n bl">–</td><td class="n">–</td><td class="n">–</td>';
+        return '<td class="n bl">' + pct(r.econ) + '</td><td class="n">' + pct(r.vote) + '</td><td class="n">' + (k === 'pool' ? 'not paid' : eurS(c.w.rows[k] ? c.w.rows[k].total : 0)) + '</td>';
+      }).join('') + '</tr>';
+    });
+    h += '<tr><td class="l" style="color:var(--muted)">EXIST</td>' + cols.map(function (c) { var x = c.r.exist; return '<td class="bl" colspan="3" style="text-align:left;font-size:.78rem;color:' + (x.over || x.later.length ? 'var(--warn)' : 'var(--muted)') + '">' + x.count + ' full-time' + (x.over ? ', over the limit' : '') + (x.later.length ? ', split changes later' : '') + '</td>'; }).join('') + '</tr>';
+    h += '<tr><td class="l" style="color:var(--muted)">Warnings</td>' + cols.map(function (c) { return '<td class="bl" colspan="3" style="text-align:left;font-size:.78rem;color:' + (c.r.warnings.length ? 'var(--bad)' : 'var(--muted)') + '">' + (c.r.warnings.length || 'none') + '</td>'; }).join('') + '</tr>';
+    h += '</tbody></table></div><p class="hint" style="margin-top:8px">End state (all months). Sale at ' + eur(price) + ' uses each setup’s own preference setting.</p>';
+    $('#cmpBody').innerHTML = h;
+  }
+  $('#scSave').addEventListener('click', function () {
+    var name = $('#scName').value.trim() || 'Setup ' + (store.saves.length + 1);
+    var ex = store.saves.find(function (s) { return s.name === name; });
+    var g = B.normalize(JSON.parse(JSON.stringify(G)));
+    if (ex) { ex.G = g; ex.at = Date.now(); toast('Updated “' + name + '”.'); }
+    else { var s = { id: uid(), name: name, at: Date.now(), G: g }; store.saves.push(s); if (store.ui.cmp.length < 4) store.ui.cmp.push(s.id); toast('Saved “' + name + '”.'); }
+    $('#scName').value = ''; persist(); renderSaves();
+  });
+  $('#scName').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#scSave').click(); });
+  $('#scList').addEventListener('change', function (e) {
+    var c = e.target.dataset.cmp; if (!c) return;
+    var cmp = store.ui.cmp.filter(function (x) { return x !== c; }); if (e.target.checked) cmp.push(c);
+    store.ui.cmp = cmp.slice(0, 4); persist(); e.target.blur(); renderSaves();
+  });
+  var pendingDel = null;
+  $('#scList').addEventListener('click', function (e) {
+    var l = e.target.closest('[data-load]'), dl2 = e.target.closest('[data-del]');
+    if (l) { var s = store.saves.find(function (x) { return x.id === l.dataset.load; }); if (!s) return; pushHist(); var m = G.month; G = B.normalize(JSON.parse(JSON.stringify(s.G))); G.month = m; l.blur(); renderAll(); toast('Loaded “' + s.name + '”.', true); window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); }
+    if (dl2) {
+      if (pendingDel !== dl2.dataset.del) { pendingDel = dl2.dataset.del; dl2.textContent = 'Confirm'; setTimeout(function () { if (pendingDel === dl2.dataset.del) { pendingDel = null; dl2.textContent = 'Delete'; } }, 3000); return; }
+      pendingDel = null; store.saves = store.saves.filter(function (x) { return x.id !== dl2.dataset.del; }); store.ui.cmp = store.ui.cmp.filter(function (x) { return x !== dl2.dataset.del; }); dl2.blur(); persist(); renderSaves(); toast('Deleted.');
+    }
+  });
+  $('#cmpPrice').addEventListener('input', function () { store.ui.cmpPrice = n(this.value); persist(); renderCompare(); });
+  function exportJSON() { return JSON.stringify({ app: 'trace-equity-game', version: 2, exported: new Date().toISOString(), current: G, saves: store.saves.map(function (s) { return { name: s.name, at: s.at, G: s.G }; }) }, null, 2); }
+  function ioMsg(t) { $('#ioMsg').textContent = t; }
+  var dl = null;
+  if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then(function (x) { dl = x; $('#exDownload').hidden = !x; }).catch(function () {});
+  else $('#exDownload').hidden = false;
+  $('#exCopy').addEventListener('click', function () {
+    var t = exportJSON(); $('#ioText').value = t;
+    try { navigator.clipboard.writeText(t).then(function () { ioMsg('Copied. Also shown in the box below.'); }, function () { $('#ioText').select(); ioMsg('Copy was blocked here. The JSON is selected below; press Ctrl/Cmd+C.'); }); }
+    catch (err) { $('#ioText').select(); ioMsg('The JSON is selected below; press Ctrl/Cmd+C.'); }
+  });
+  $('#exDownload').addEventListener('click', function () {
+    var t = exportJSON(), fn = 'trace-equity-setups-' + new Date().toISOString().slice(0, 10) + '.json';
+    if (dl) { dl.save({ filename: fn, data: t }).then(function () { ioMsg('Saved ' + fn + '.'); }, function (er) { ioMsg(er && er.code === 'declined' ? 'Download cancelled.' : 'Download is not available here. Use Copy JSON.'); }); return; }
+    var u = URL.createObjectURL(new Blob([t], { type: 'application/json' })), a = document.createElement('a');
+    a.href = u; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
+    ioMsg('Downloaded ' + fn + '.');
+  });
+  function importText(t) {
+    var d; try { d = JSON.parse(t); } catch (e) { ioMsg('That is not valid JSON. Paste the full exported text.'); return; }
+    var list = [];
+    if (d && Array.isArray(d.saves)) list = d.saves.slice();
+    if (d && d.current && d.current.team) list.push({ name: 'Imported board', G: d.current });
+    var added = 0;
+    list.forEach(function (s) {
+      if (!s || !s.G || !s.G.team) return;
+      var nm = String(s.name || 'Imported'), base = nm, k = 2;
+      while (store.saves.some(function (x) { return x.name === nm; })) nm = base + ' (' + (k++) + ')';
+      store.saves.push({ id: uid(), name: nm, at: Date.now(), G: B.normalize(s.G) }); added++;
+    });
+    if (!added) { ioMsg('No setups found in that JSON.'); return; }
+    ioMsg('Imported ' + added + ' setup' + (added > 1 ? 's' : '') + '. Load one or tick it to compare.'); persist(); renderSaves();
+  }
+  $('#imFile').addEventListener('change', function () { var f = this.files && this.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { importText(String(r.result)); }; r.onerror = function () { ioMsg('Could not read that file.'); }; r.readAsText(f); this.value = ''; });
+  $('#imPaste').addEventListener('click', function () { var t = $('#ioText').value.trim(); if (!t) { ioMsg('Paste exported JSON into the box first.'); return; } importText(t); });
+
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { es.forEach(function (e) { $('#mbar').classList.toggle('show', !e.isIntersecting); }); }).observe($('#score'));
+
+  applyTheme();
+  renderAll();
+})();
+</script>
+
+</body></html>
