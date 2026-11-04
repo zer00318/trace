@@ -892,7 +892,6 @@ var GameBuilder = (function () {
   var CAST = [
     { id: 'pranav', name: 'Pranav', full: 'Pranav', blurb: 'Founder. Built the prototype alone and put in a little over €2,000. Owns 100% today.' },
     { id: 'zahra', name: 'Zahra', full: 'Zahra Abbasi', blurb: 'Chosen co-founder. Business side: digital health, product, funding.' },
-    { id: 'ahmed', name: 'Ahmed', full: 'Ahmed Alshembari', blurb: 'ML researcher. Possible technical co-founder or first hire.' },
     { id: 'florian', name: 'Florian', full: 'Florian Nick', blurb: 'Former start-up CTO. Possible part-time co-founder (1–2 days a week) or advisor.' }
   ];
   var IDS = CAST.map(function (c) { return c.id; });
@@ -905,11 +904,11 @@ var GameBuilder = (function () {
   function defaults() {
     return {
       v: 2,
-      team: { pranav: { in: true, role: 'ft' }, zahra: { in: false, role: 'ft' }, ahmed: { in: false, role: 'ft' }, florian: { in: false, role: 'pt' } },
-      split: { pranav: 100, zahra: 0, ahmed: 0, florian: 0 },
+      team: { pranav: { in: true, role: 'ft' }, zahra: { in: false, role: 'ft' }, florian: { in: false, role: 'pt' } },
+      split: { pranav: 100, zahra: 0, florian: 0 },
       lock: {},
-      grant: { zahra: copy(GRANT_DEFAULT.hire), ahmed: copy(GRANT_DEFAULT.hire), florian: copy(GRANT_DEFAULT.adv) },
-      ms: { pranav: { stake: 0, deadline: 18, status: 'open' }, zahra: { stake: 0, deadline: 18, status: 'open' }, ahmed: { stake: 0, deadline: 18, status: 'open' }, florian: { stake: 0, deadline: 18, status: 'open' } },
+      grant: { zahra: copy(GRANT_DEFAULT.hire), florian: copy(GRANT_DEFAULT.adv) },
+      ms: { pranav: { stake: 0, deadline: 18, status: 'open' }, zahra: { stake: 0, deadline: 18, status: 'open' }, florian: { stake: 0, deadline: 18, status: 'open' } },
       credit: { on: false, pct: 10 },
       cash: { mode: 'none', amount: 2000, valuation: 500000 },
       vest: { on: false, years: 4, cliff: 12, backdate: 0, rule: 'pool', ext: 3 },
@@ -1020,7 +1019,7 @@ if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
   'use strict';
   var E = EquityEngine, B = GameBuilder;
   var LS = 'trace-equity-game-v2';
-  var COLOR = { pranav: 'var(--c0)', zahra: 'var(--c1)', ahmed: 'var(--c2)', florian: 'var(--c3)' };
+  var COLOR = { pranav: 'var(--c0)', zahra: 'var(--c1)', florian: 'var(--c2)' };
   var CASTBY = {}; B.CAST.forEach(function (c) { CASTBY[c.id] = c; });
 
   // ---------- state ----------
