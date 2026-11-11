@@ -294,10 +294,12 @@ footer strong { color: var(--ink); }
       <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3 2 6l3 3"/><path d="M2.5 6H10a4 4 0 0 1 0 8H7"/></svg>Undo</button>
       <button class="btn" id="redoBtn" title="Redo (Shift+Ctrl/Cmd+Z)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m11 3 3 3-3 3"/><path d="M13.5 6H6a4 4 0 0 0 0 8h3"/></svg>Redo</button>
       <button class="btn" id="resetBtn" title="Back to today: Pranav 100%">Start over</button>
+      <button class="btn primary" id="linkBtn" title="Copy a link that reopens exactly this board on any device">Copy link to my setup</button>
       <a class="btn" href="#saves">Save &amp; compare</a>
       <button class="btn" id="themeBtn">Theme: system</button>
     </div>
   </header>
+  <div class="msg neutral" id="saveNote" style="margin-bottom:18px"></div>
 
   <div class="game">
     <aside class="board" aria-label="Scoreboard">
@@ -1034,11 +1036,54 @@ if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
       if (d0.ui) Object.assign(store.ui, d0.ui);
     }
   } catch (e) { /* storage unavailable */ }
+  var canStore = false;
+  try { localStorage.setItem(LS + '-probe', '1'); localStorage.removeItem(LS + '-probe'); canStore = true; } catch (e) { /* private mode or blocked */ }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) { /* ignore */ }
+
+  // The URL also carries the board (#s=...), so a copied link restores it on any browser or device.
+  var HASH = 's=';
+  function b64e(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+  function shareURL() {
+    var d = { v: 2, G: G, saves: store.saves.map(function (s) { return { name: s.name, at: s.at, G: s.G }; }) };
+    return location.href.split('#')[0] + '#' + HASH + b64e(JSON.stringify(d));
+  }
+  var linkState = 'none';
+  try {
+    var h0 = location.hash.slice(1);
+    if (h0.indexOf(HASH) === 0) {
+      var d1 = JSON.parse(b64d(h0.slice(HASH.length)));
+      if (d1 && d1.G && d1.G.team) {
+        var g1 = B.normalize(d1.G);
+        // Keep this browser's own board as a setup instead of overwriting it with the link's.
+        if (d0 && d0.G && JSON.stringify(G) !== JSON.stringify(g1) && JSON.stringify(G) !== JSON.stringify(B.defaults()) &&
+            !store.saves.some(function (x) { return JSON.stringify(x.G) === JSON.stringify(G); }))
+          store.saves.push({ id: 's' + Math.random().toString(36).slice(2, 9), name: 'My board before opening a link', at: Date.now(), G: G });
+        G = g1; linkState = 'ok';
+      }
+      if (d1 && Array.isArray(d1.saves)) d1.saves.forEach(function (s) {
+        if (!s || !s.name || !s.G || !s.G.team) return;
+        var g = B.normalize(s.G), js = JSON.stringify(g);
+        if (store.saves.some(function (x) { return JSON.stringify(x.G) === js; })) return;
+        var nm = String(s.name), base = nm, k = 2;
+        while (store.saves.some(function (x) { return x.name === nm; })) nm = base + ' (' + (k++) + ')';
+        store.saves.push({ id: 's' + Math.random().toString(36).slice(2, 9), name: nm, at: s.at, G: g });
+      });
+      if (linkState !== 'ok') linkState = 'bad';
+    }
+  } catch (e) { linkState = 'bad'; }
   var saveT = null;
+  function writeNow() {
+    clearTimeout(saveT); saveT = null;
+    try { localStorage.setItem(LS, JSON.stringify({ v: 2, G: G, saves: store.saves, ui: store.ui })); } catch (e) { /* ignore */ }
+    try { history.replaceState(history.state, '', shareURL()); } catch (e) { /* ignore */ }
+  }
   function persist() {
     clearTimeout(saveT);
-    saveT = setTimeout(function () { try { localStorage.setItem(LS, JSON.stringify({ v: 2, G: G, saves: store.saves, ui: store.ui })); } catch (e) { /* ignore */ } }, 250);
+    saveT = setTimeout(writeNow, 250);
   }
+  window.addEventListener('pagehide', function () { if (saveT) writeNow(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && saveT) writeNow(); });
 
   // ---------- helpers ----------
   function $(s) { return document.querySelector(s); }
@@ -1676,6 +1721,23 @@ if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
   }
   $('#imFile').addEventListener('change', function () { var f = this.files && this.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { importText(String(r.result)); }; r.onerror = function () { ioMsg('Could not read that file.'); }; r.readAsText(f); this.value = ''; });
   $('#imPaste').addEventListener('click', function () { var t = $('#ioText').value.trim(); if (!t) { ioMsg('Paste exported JSON into the box first.'); return; } importText(t); });
+
+  (function () {
+    var el = $('#saveNote'), t, cls = 'neutral', ic = 'i';
+    if (linkState === 'ok') t = 'Opened from a shared link: this is the board saved in that link. Changes save in this browser and update the address bar.';
+    else if (linkState === 'bad') { t = 'This link could not be read (it may be cut off). Showing the board saved in this browser instead.'; cls = 'warn'; ic = '!'; }
+    else t = 'Your choices save automatically, but only in this browser on this device. To keep them elsewhere or show them to someone, press “Copy link to my setup” and send or bookmark the link.';
+    if (!canStore) { t = 'This browser is not saving anything (private browsing or blocked storage). Press “Copy link to my setup” before you close the page, or your choices are lost.'; cls = 'bad'; ic = '!'; }
+    el.className = 'msg ' + cls;
+    el.innerHTML = '<span class="ic">' + ic + '</span><span>' + esc(t) + '</span>';
+  })();
+  $('#linkBtn').addEventListener('click', function () {
+    writeNow();
+    var u = shareURL();
+    function manual() { window.prompt('Copy this link. Opening it restores this exact board:', u); }
+    try { navigator.clipboard.writeText(u).then(function () { toast('Link copied. Paste it into WhatsApp or a note; opening it restores this board.'); }, manual); }
+    catch (e) { manual(); }
+  });
 
   if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { es.forEach(function (e) { $('#mbar').classList.toggle('show', !e.isIntersecting); }); }).observe($('#score'));
 
