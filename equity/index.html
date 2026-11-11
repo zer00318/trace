@@ -1059,7 +1059,9 @@ if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
         if (d0 && d0.G && JSON.stringify(G) !== JSON.stringify(g1) && JSON.stringify(G) !== JSON.stringify(B.defaults()) &&
             !store.saves.some(function (x) { return JSON.stringify(x.G) === JSON.stringify(G); }))
           store.saves.push({ id: 's' + Math.random().toString(36).slice(2, 9), name: 'My board before opening a link', at: Date.now(), G: G });
-        G = g1; linkState = 'ok';
+        // A reload of your own board carries your own link: only say "shared link" when it brought something new.
+        linkState = JSON.stringify(G) === JSON.stringify(g1) ? 'same' : 'ok';
+        G = g1;
       }
       if (d1 && Array.isArray(d1.saves)) d1.saves.forEach(function (s) {
         if (!s || !s.name || !s.G || !s.G.team) return;
@@ -1069,7 +1071,7 @@ if (typeof module !== 'undefined') module.exports.GameBuilder = GameBuilder;
         while (store.saves.some(function (x) { return x.name === nm; })) nm = base + ' (' + (k++) + ')';
         store.saves.push({ id: 's' + Math.random().toString(36).slice(2, 9), name: nm, at: s.at, G: g });
       });
-      if (linkState !== 'ok') linkState = 'bad';
+      if (linkState === 'none') linkState = 'bad';
     }
   } catch (e) { linkState = 'bad'; }
   var saveT = null;
